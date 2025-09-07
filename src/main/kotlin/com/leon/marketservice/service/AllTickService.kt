@@ -4,7 +4,6 @@ import com.leon.marketservice.config.AllTickConfig
 import com.leon.marketservice.model.DataSource
 import com.leon.marketservice.model.MarketData
 import org.slf4j.LoggerFactory
-import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.WebClientResponseException
@@ -23,7 +22,7 @@ import java.time.LocalDateTime
 @Service
 class AllTickService(
     private val config: AllTickConfig,
-    @Qualifier("allTickWebClient") private val webClient: WebClient
+    private val webClient: WebClient
 ) {
     
     // Logger for this service

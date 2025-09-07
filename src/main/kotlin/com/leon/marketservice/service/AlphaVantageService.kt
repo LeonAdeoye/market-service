@@ -4,7 +4,6 @@ import com.leon.marketservice.config.AlphaVantageConfig
 import com.leon.marketservice.model.DataSource
 import com.leon.marketservice.model.MarketData
 import org.slf4j.LoggerFactory
-import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.WebClientResponseException
@@ -24,7 +23,7 @@ import java.time.format.DateTimeFormatter
 @Service
 class AlphaVantageService(
     private val config: AlphaVantageConfig,
-    @Qualifier("alphaVantageWebClient") private val webClient: WebClient
+    private val webClient: WebClient
 ) {
     
     // Logger for this service
