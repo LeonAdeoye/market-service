@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*
 
 @RestController
 @CrossOrigin
-class SubscriptionController(private val marketDataService: MarketDataService)
+class SubscriptionController(private val marketDataService: MarketDataService) 
 {
     private val logger = LoggerFactory.getLogger(SubscriptionController::class.java)
 
@@ -23,10 +23,10 @@ class SubscriptionController(private val marketDataService: MarketDataService)
      * @return ResponseEntity containing the subscription response
      */
     @PostMapping("/subscribe")
-    fun subscribe(@Valid @RequestBody request: SubscriptionRequest): ResponseEntity<SubscriptionResponse>
+    fun subscribe(@Valid @RequestBody request: SubscriptionRequest): ResponseEntity<SubscriptionResponse> 
     {
         logger.info("Received subscription request for RICs: ${request.rics}")
-        return try
+        return try 
         {
             val response = marketDataService.subscribe(request)
             logger.info("Successfully created subscription: ${response.subscriptionId}")
@@ -48,7 +48,7 @@ class SubscriptionController(private val marketDataService: MarketDataService)
      * @return ResponseEntity with success/failure message
      */
     @DeleteMapping("/unsubscribe/{ric}")
-    fun unsubscribe(@PathVariable ric: String): ResponseEntity<Map<String, Any>>
+    fun unsubscribe(@PathVariable ric: String): ResponseEntity<Map<String, Any>> 
     {
         logger.info("Received unsubscribe request for RIC: $ric")
         return try
@@ -71,7 +71,7 @@ class SubscriptionController(private val marketDataService: MarketDataService)
      * @return ResponseEntity containing the list of subscriptions
      */
     @GetMapping("/subscriptions")
-    fun getSubscriptions(): ResponseEntity<Map<String, Any>>
+    fun getSubscriptions(): ResponseEntity<Map<String, Any>> 
     {
         logger.info("Received request for all subscriptions")
         return try

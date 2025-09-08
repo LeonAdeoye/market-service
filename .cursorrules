@@ -1,0 +1,402 @@
+# Leon's Coding Style Guide for Cursor AI
+
+This document defines the coding style standards that Cursor AI should follow for JavaScript, Java, and Kotlin applications.
+
+## General Principles
+
+- **Readability First**: Code should be self-documenting and easy to read
+- **Consistency**: Follow the same patterns throughout the codebase
+- **Clarity**: Use clear variable names and logical structure
+
+## Indentation and Spacing
+
+- **Use 4 spaces** for indentation (no tabs)
+- **Empty lines** for logical separation between code blocks
+- **No trailing whitespace**
+
+## Import Statements
+
+- **Remove unused imports** - Always clean up unused imports
+- **No blank lines between imports** - Keep all imports together without gaps
+- **Group imports logically** - Group related imports together
+- **Example**:
+```java
+import com.leon.pricing.service.PerformanceTrackingService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+```
+
+## Curly Braces
+
+### All Languages (Java, JavaScript, Kotlin)
+
+**Opening braces on their own line:**
+```java
+if (condition)
+{
+    // code here
+}
+
+public void methodName()
+{
+    // code here
+}
+
+class MyClass
+{
+    // code here
+}
+```
+
+**NOT:**
+```java
+if (condition) {
+    // code here
+}
+```
+
+## Control Structures
+
+### If Statements
+
+**Single-line if statements without braces:**
+```java
+if (condition)
+    return value;
+
+if (value > endValue) 
+    break;
+```
+
+**Multi-line if statements with braces:**
+```java
+if (condition)
+{
+    // multiple lines
+    doSomething();
+    doSomethingElse();
+}
+```
+
+**If-else statements:**
+```java
+if (isCallOption)
+    return calculateCallPrice();
+else
+    return calculatePutPrice();
+```
+
+### Loops
+
+**For loops:**
+```java
+for (int i = 0; i < iterations; i++)
+{
+    // code here
+}
+
+for (CompletableFuture<OptionPriceResult> future : futures)
+{
+    // code here
+}
+```
+
+**While loops:**
+```java
+while (condition)
+{
+    // code here
+}
+```
+
+## Lambda Expressions and Arrow Functions
+
+### Java Lambda Expressions
+
+**Single-line lambdas:**
+```java
+.map(item -> item.getValue())
+.filter(x -> x > 0)
+```
+
+**Multi-line lambdas with braces on new line:**
+```java
+CompletableFuture<OptionPriceResult> future = CompletableFuture.supplyAsync(() -> 
+{
+    Map<String, Double> inputCopy = new HashMap<>(input);
+    inputCopy.put(rangeKey, currentValue);
+    OptionPriceResult result = calculate(inputCopy);
+    result.setRangeVariable(currentValue);
+    return result;
+}, executor);
+```
+
+### JavaScript Arrow Functions
+
+**Single-line arrow functions:**
+```javascript
+const result = items.map(item => item.value);
+const filtered = items.filter(x => x > 0);
+```
+
+**Multi-line arrow functions with braces on new line:**
+```javascript
+const processData = (data) => 
+{
+    const processed = data.map(item => 
+    {
+        return {
+            id: item.id,
+            value: item.value * 2
+        };
+    });
+    return processed;
+};
+```
+
+### Kotlin Lambda Expressions
+
+**Single-line lambdas:**
+```kotlin
+val result = items.map { it.value }
+val filtered = items.filter { it > 0 }
+```
+
+**Multi-line lambdas with braces on new line:**
+```kotlin
+val future = CompletableFuture.supplyAsync {
+    val inputCopy = input.toMutableMap()
+    inputCopy[rangeKey] = currentValue
+    val result = calculate(inputCopy)
+    result.rangeVariable = currentValue
+    result
+}
+```
+
+## Method and Function Declarations
+
+### Java Methods
+
+```java
+public void methodName(String parameter1, int parameter2)
+{
+    // method body
+}
+
+private double calculatePrice(double underlyingPrice, double strike)
+{
+    // method body
+}
+```
+
+### JavaScript Functions
+
+```javascript
+function methodName(parameter1, parameter2)
+{
+    // function body
+}
+
+const methodName = (parameter1, parameter2) => 
+{
+    // function body
+};
+```
+
+### Kotlin Functions
+
+```kotlin
+fun methodName(parameter1: String, parameter2: Int)
+{
+    // function body
+}
+
+private fun calculatePrice(underlyingPrice: Double, strike: Double): Double
+{
+    // function body
+}
+```
+
+## Class Declarations
+
+### Java Classes
+
+```java
+@Component
+public class MyClass implements MyInterface
+{
+    private static final Logger logger = LoggerFactory.getLogger(MyClass.class);
+    
+    @Autowired
+    private MyService myService;
+    
+    public MyClass() {}
+    
+    public void methodName()
+    {
+        // method body
+    }
+}
+```
+
+### JavaScript Classes
+
+```javascript
+class MyClass
+{
+    constructor(service)
+    {
+        this.service = service;
+    }
+    
+    methodName()
+    {
+        // method body
+    }
+}
+```
+
+### Kotlin Classes
+
+```kotlin
+@Component
+class MyClass @Autowired constructor(
+    private val myService: MyService
+) : MyInterface
+{
+    fun methodName()
+    {
+        // method body
+    }
+}
+```
+
+## Exception Handling
+
+### Java Try-Catch
+
+```java
+try
+{
+    // code that might throw exception
+}
+catch (Exception e)
+{
+    logger.error("Error message: {}", e.getMessage());
+    throw new RuntimeException("Error: " + e.getMessage());
+}
+```
+
+### JavaScript Try-Catch
+
+```javascript
+try
+{
+    // code that might throw exception
+}
+catch (error)
+{
+    console.error('Error message:', error.message);
+    throw new Error('Error: ' + error.message);
+}
+```
+
+### Kotlin Try-Catch
+
+```kotlin
+try
+{
+    // code that might throw exception
+}
+catch (e: Exception)
+{
+    logger.error("Error message: {}", e.message)
+    throw RuntimeException("Error: ${e.message}")
+}
+```
+
+## Annotations
+
+**Annotations on separate lines:**
+```java
+@Override
+public void methodName()
+{
+    // method body
+}
+
+@Autowired
+@Qualifier("myService")
+private MyService myService;
+```
+
+## Method Chaining
+
+**Break long method chains:**
+```java
+CompletableFuture<Void> allFutures = CompletableFuture.allOf(
+    futures.toArray(new CompletableFuture[0])
+);
+
+allFutures.thenRun(() -> 
+{
+    // code here
+}).join();
+```
+
+## Variable Declarations
+
+**One variable per line:**
+```java
+private double adjustedNormalizedDrift = 0.0;
+private double adjustedNormalizedDriftOffsetByVolatility = 0.0;
+private double discountFactor = 0.0;
+```
+
+**Final variables when appropriate:**
+```java
+final double currentValue = value;
+```
+
+## Comments
+
+**Use meaningful comments:**
+```java
+// Calculate the number of iterations
+int iterations = (int) Math.ceil((endValue - startValue) / increment) + 1;
+
+// Create CompletableFutures for parallel execution
+List<CompletableFuture<OptionPriceResult>> futures = new ArrayList<>();
+```
+
+## File Organization
+
+1. **Package/Import statements** at the top
+2. **Class declaration**
+3. **Static fields**
+4. **Instance fields**
+5. **Constructors**
+6. **Public methods**
+7. **Private methods**
+
+## Naming Conventions
+
+- **Classes**: PascalCase (`MyClass`, `OptionPricingService`)
+- **Methods/Variables**: camelCase (`methodName`, `variableName`)
+- **Constants**: UPPER_SNAKE_CASE (`DEFAULT_ITERATIONS`, `MAX_VALUE`)
+- **Packages**: lowercase (`com.leon.pricing.model`)
+
+## IMPORTANT: Always Follow This Style
+
+When writing code, ALWAYS follow these formatting rules:
+1. Put opening curly braces on their own line
+2. Use single-line if statements without braces when appropriate
+3. Use 4-space indentation
+4. Put lambda/arrow function braces on new lines for multi-line bodies
+5. Put annotations on separate lines
+6. Use meaningful variable names
+7. Add empty lines for logical separation
+
+This style guide should be followed consistently across all JavaScript, Java, and Kotlin projects to maintain code readability and consistency.
+

@@ -12,7 +12,8 @@ import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean
  * provides custom validation rules for market data operations.
  */
 @Configuration
-class ValidationConfig {
+class ValidationConfig 
+{
 
     /**
      * Local validator factory bean
@@ -21,7 +22,8 @@ class ValidationConfig {
      * @return LocalValidatorFactoryBean instance
      */
     @Bean
-    fun validator(): LocalValidatorFactoryBean {
+    fun validator(): LocalValidatorFactoryBean 
+    {
         return LocalValidatorFactoryBean()
     }
 }

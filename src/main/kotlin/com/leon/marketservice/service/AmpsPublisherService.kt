@@ -22,7 +22,8 @@ import java.util.concurrent.ConcurrentHashMap
 class AmpsPublisherService(
     private val config: AmpsConfig,
     private val objectMapper: ObjectMapper
-) {
+) 
+{
     
     // Logger for this service
     private val logger = LoggerFactory.getLogger(AmpsPublisherService::class.java)
@@ -39,8 +40,10 @@ class AmpsPublisherService(
      * 
      * @throws Exception if connection fails
      */
-    fun initialize() {
-        try {
+    fun initialize() 
+    {
+        try 
+        {
             logger.info("Initializing AMPS connection to ${config.serverUrl}")
             
             // Simulate AMPS connection for demonstration
@@ -48,7 +51,9 @@ class AmpsPublisherService(
             isConnected = true
             logger.info("Successfully connected to AMPS server (simulated)")
             
-        } catch (e: Exception) {
+        } 
+        catch (e: Exception) 
+        {
             logger.error("Failed to connect to AMPS server", e)
             isConnected = false
             throw e
@@ -62,8 +67,10 @@ class AmpsPublisherService(
      * @param marketData The market data to publish
      * @throws Exception if publishing fails
      */
-    fun publishMarketData(marketData: MarketData) {
-        if (!isConnected) {
+    fun publishMarketData(marketData: MarketData) 
+    {
+        if (!isConnected) 
+        {
             logger.warn("AMPS not connected, attempting to reconnect")
             initialize()
         }
@@ -92,8 +99,10 @@ class AmpsPublisherService(
      * @param marketDataList List of market data items to publish
      * @throws Exception if batch publishing fails
      */
-    fun publishMarketDataBatch(marketDataList: List<MarketData>) {
-        if (!isConnected) {
+    fun publishMarketDataBatch(marketDataList: List<MarketData>) 
+    {
+        if (!isConnected) 
+        {
             logger.warn("AMPS not connected, attempting to reconnect")
             initialize()
         }
@@ -120,7 +129,8 @@ class AmpsPublisherService(
      * @param ric The RIC code
      * @return The AMPS topic name
      */
-    private fun getTopicForRic(ric: String): String {
+    private fun getTopicForRic(ric: String): String 
+    {
         return topicCache.computeIfAbsent(ric) { 
             "${config.topicPrefix}.${ric.replace(".", "_")}"
         }
@@ -133,7 +143,8 @@ class AmpsPublisherService(
      * @param marketData The market data to convert
      * @return Map containing message data
      */
-    private fun createMessageData(marketData: MarketData): Map<String, Any> {
+    private fun createMessageData(marketData: MarketData): Map<String, Any> 
+    {
         val messageData = mutableMapOf<String, Any>()
         
         // Set message fields
@@ -163,7 +174,8 @@ class AmpsPublisherService(
      * 
      * @return true if connected, false otherwise
      */
-    fun isConnected(): Boolean {
+    fun isConnected(): Boolean 
+    {
         return isConnected
     }
 
@@ -171,12 +183,16 @@ class AmpsPublisherService(
      * Disconnect from AMPS
      * Closes the connection to the AMPS server
      */
-    fun disconnect() {
-        try {
+    fun disconnect() 
+    {
+        try 
+        {
             // Simulate AMPS disconnection for demonstration
             isConnected = false
             logger.info("Disconnected from AMPS server (simulated)")
-        } catch (e: Exception) {
+        } 
+        catch (e: Exception) 
+        {
             logger.error("Error disconnecting from AMPS server", e)
         }
     }
@@ -187,7 +203,8 @@ class AmpsPublisherService(
      * 
      * @return Map containing connection status details
      */
-    fun getConnectionStatus(): Map<String, Any> {
+    fun getConnectionStatus(): Map<String, Any> 
+    {
         return mapOf(
             "connected" to isConnected,
             "serverUrl" to config.serverUrl,

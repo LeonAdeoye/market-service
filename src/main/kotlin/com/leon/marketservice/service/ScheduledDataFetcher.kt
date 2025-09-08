@@ -1,7 +1,10 @@
 package com.leon.marketservice.service
 
+import com.leon.marketservice.config.MarketDataConfig
 import com.leon.marketservice.model.DataSource
+import com.leon.marketservice.model.SubscriptionInfo
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import java.util.concurrent.ConcurrentHashMap
@@ -19,99 +22,157 @@ class ScheduledDataFetcher(
     private val alphaVantageService: AlphaVantageService,
     private val allTickService: AllTickService,
     private val ampsPublisherService: AmpsPublisherService,
-    private val throttleService: ThrottleService
-) {
+    private val marketDataConfig: MarketDataConfig
+) 
+{
     
     // Logger for this service
     private val logger = LoggerFactory.getLogger(ScheduledDataFetcher::class.java)
     
+    // Configurable fetch interval (default 30 seconds)
+    @Value("\${market.data.scheduled.fetch.interval.seconds:30}")
+    private var fetchIntervalSeconds: Long = 30
+    
     // Track active subscriptions for scheduled fetching
     private val activeSubscriptions = ConcurrentHashMap<String, SubscriptionInfo>()
     
-    // Statistics tracking
-    private var totalFetches = 0L
-    private var successfulFetches = 0L
-    private var failedFetches = 0L
+    // Alpha Vantage batching - track current batch index
+    private var alphaVantageBatchIndex = 0
+    private val alphaVantageBatchSize = 5 // Respect 5 calls per minute limit
 
     /**
-     * Scheduled task that runs every 30 seconds
-     * Fetches market data for all active subscriptions that are ready for update
+     * Scheduled task that runs at configurable intervals
+     * Fetches market data with proper batching for Alpha Vantage rate limits
      */
-    @Scheduled(fixedRate = 30000) // Run every 30 seconds
-    fun fetchMarketDataScheduled() {
-        logger.debug("Running scheduled market data fetch")
+    @Scheduled(fixedRateString = "\${market.data.scheduled.fetch.interval.seconds:30}000") // Configurable interval
+    fun fetchMarketDataScheduled() 
+    {
+        logger.debug("Running scheduled market data fetch (interval: ${fetchIntervalSeconds}s)")
         
-        try {
+        try 
+        {
             // Get all active subscriptions
             val subscriptions = marketDataService.getActiveSubscriptions()
             val subscriptionList = subscriptions["subscriptions"] as? List<Map<String, Any>> ?: emptyList()
             
+            if (subscriptionList.isEmpty()) 
+            {
+                logger.debug("No active subscriptions to fetch")
+                return
+            }
+            
+            // Extract RICs and group by data source
+            val alphaVantageRics = mutableListOf<String>()
+            val allTickRics = mutableListOf<String>()
+            
             for (subscription in subscriptionList) {
                 val ric = subscription["ric"] as String
+                val dataSource = subscription["dataSource"] as? String ?: "ALPHA_VANTAGE"
                 
-                // Check if this RIC is ready for update (throttle check)
-                if (throttleService.canUpdate(ric)) {
-                    fetchDataForRic(ric, subscription)
-                } else {
-                    logger.debug("Skipping $ric - throttle active")
+                when (DataSource.valueOf(dataSource)) {
+                    DataSource.ALPHA_VANTAGE -> alphaVantageRics.add(ric)
+                    DataSource.ALL_TICK -> allTickRics.add(ric)
                 }
             }
             
-        } catch (e: Exception) {
+            // Fetch AllTick data (all RICs at once - no rate limits)
+            if (allTickRics.isNotEmpty() && marketDataConfig.isAllTickEnabled()) {
+                fetchAndPublishData(allTickRics, DataSource.ALL_TICK)
+            } else if (allTickRics.isNotEmpty() && !marketDataConfig.isAllTickEnabled()) {
+                logger.warn("AllTick RICs found but AllTick is disabled (no RIC endings configured)")
+            }
+            
+            // Fetch Alpha Vantage data (batched to respect 5 calls/minute limit)
+            if (alphaVantageRics.isNotEmpty() && marketDataConfig.isAlphaVantageEnabled()) {
+                fetchAlphaVantageBatch(alphaVantageRics)
+            } else if (alphaVantageRics.isNotEmpty() && !marketDataConfig.isAlphaVantageEnabled()) {
+                logger.warn("Alpha Vantage RICs found but Alpha Vantage is disabled (no RIC endings configured)")
+            }
+            
+        } 
+        catch (e: Exception) 
+        {
             logger.error("Error in scheduled market data fetch", e)
         }
     }
 
     /**
-     * Fetch market data for a specific RIC
-     * Handles the actual data fetching and publishing
+     * Fetch Alpha Vantage data in batches to respect rate limits
+     * Cycles through RICs in batches of 5 every 30 seconds
      * 
-     * @param ric The RIC code to fetch data for
-     * @param subscription The subscription information
+     * @param allRics All Alpha Vantage RICs to cycle through
      */
-    private fun fetchDataForRic(ric: String, subscription: Map<String, Any>) {
-        try {
-            val dataSource = subscription["dataSource"] as? String ?: "ALPHA_VANTAGE"
-            val intervals = subscription["intervals"] as? List<String> ?: listOf("1min")
-            
-            logger.debug("Fetching data for $ric using $dataSource")
-            
-            // Fetch data based on the configured data source
-            val marketData = when (DataSource.valueOf(dataSource)) {
-                DataSource.ALPHA_VANTAGE -> {
-                    if (alphaVantageService.isAvailable()) {
-                        alphaVantageService.fetchMarketData(ric, intervals.first())
-                    } else {
-                        logger.warn("Alpha Vantage unavailable, skipping $ric")
-                        return
+    private fun fetchAlphaVantageBatch(allRics: List<String>) 
+    {
+        if (allRics.isEmpty()) 
+            return
+        
+        // Calculate batch boundaries
+        val startIndex = alphaVantageBatchIndex % allRics.size
+        val endIndex = minOf(startIndex + alphaVantageBatchSize, allRics.size)
+        
+        // Get current batch of RICs
+        val currentBatch = if (startIndex < endIndex) {
+            allRics.subList(startIndex, endIndex)
+        } else {
+            // Wrap around to beginning
+            allRics.take(alphaVantageBatchSize)
+        }
+        
+        logger.debug("Fetching Alpha Vantage batch ${alphaVantageBatchIndex + 1}: ${currentBatch.size} RICs (${currentBatch.joinToString()})")
+        
+        if (alphaVantageService.isAvailable()) {
+            alphaVantageService.fetchMarketDataForSymbols(currentBatch)
+                .subscribe(
+                    { marketData -> 
+                        ampsPublisherService.publishMarketData(marketData)
+                        logger.debug("Published Alpha Vantage data for ${marketData.ric}")
+                    },
+                    { error -> 
+                        logger.error("Error fetching Alpha Vantage batch", error)
                     }
-                }
-                DataSource.ALL_TICK -> {
-                    if (allTickService.isAvailable()) {
-                        allTickService.fetchMarketData(ric, intervals.first())
-                    } else {
-                        logger.warn("AllTick unavailable, skipping $ric")
-                        return
-                    }
+                )
+        } else {
+            logger.warn("Alpha Vantage unavailable, skipping batch of ${currentBatch.size} RICs")
+        }
+        
+        // Move to next batch for next scheduled run
+        alphaVantageBatchIndex = (alphaVantageBatchIndex + alphaVantageBatchSize) % allRics.size
+    }
+
+    /**
+     * Fetch and publish market data for AllTick (no rate limits)
+     * Fetches all RICs concurrently
+     * 
+     * @param rics List of RIC codes to fetch
+     */
+    private fun fetchAndPublishData(rics: List<String>, dataSource: DataSource) 
+    {
+        logger.debug("Fetching data for ${rics.size} RICs using $dataSource")
+        
+        when (dataSource) 
+        {
+            DataSource.ALL_TICK -> 
+            {
+                if (allTickService.isAvailable()) 
+                {
+                    allTickService.fetchMarketDataForSymbols(rics)
+                        .subscribe(
+                            { marketData -> 
+                                ampsPublisherService.publishMarketData(marketData)
+                                logger.debug("Published AllTick data for ${marketData.ric}")
+                            },
+                            { error -> 
+                                logger.error("Error fetching AllTick data", error)
+                            }
+                        )
+                } else {
+                    logger.warn("AllTick unavailable, skipping ${rics.size} RICs")
                 }
             }
-            
-            // Publish the market data to AMPS
-            ampsPublisherService.publishMarketData(marketData)
-            
-            // Record the update time for throttling
-            throttleService.recordUpdate(ric)
-            
-            // Update statistics
-            totalFetches++
-            successfulFetches++
-            
-            logger.info("Successfully fetched and published data for $ric")
-            
-        } catch (e: Exception) {
-            logger.error("Failed to fetch data for $ric", e)
-            totalFetches++
-            failedFetches++
+            else -> {
+                logger.warn("Unexpected data source: $dataSource")
+            }
         }
     }
 
@@ -123,7 +184,8 @@ class ScheduledDataFetcher(
      * @param dataSource The data source to use
      * @param intervals The time intervals for data
      */
-    fun addSubscription(ric: String, dataSource: DataSource, intervals: List<String>) {
+    fun addSubscription(ric: String, dataSource: DataSource, intervals: List<String>) 
+    {
         val subscriptionInfo = SubscriptionInfo(
             ric = ric,
             dataSource = dataSource,
@@ -141,9 +203,37 @@ class ScheduledDataFetcher(
      * 
      * @param ric The RIC code to remove
      */
-    fun removeSubscription(ric: String) {
+    fun removeSubscription(ric: String) 
+    {
         activeSubscriptions.remove(ric)
         logger.info("Removed subscription for $ric from scheduled fetching")
+    }
+
+    /**
+     * Update the fetch interval dynamically
+     * Allows changing the scheduler interval at runtime
+     * 
+     * @param intervalSeconds New interval in seconds
+     */
+    fun updateFetchInterval(intervalSeconds: Long) 
+    {
+        if (intervalSeconds < 1) 
+        {
+            throw IllegalArgumentException("Fetch interval must be at least 1 second")
+        }
+        
+        fetchIntervalSeconds = intervalSeconds
+        logger.info("Updated fetch interval to ${intervalSeconds} seconds")
+    }
+
+    /**
+     * Get current fetch interval
+     * 
+     * @return Current interval in seconds
+     */
+    fun getFetchInterval(): Long 
+    {
+        return fetchIntervalSeconds
     }
 
     /**
@@ -152,45 +242,48 @@ class ScheduledDataFetcher(
      * 
      * @return Map containing fetching status information
      */
-    fun getFetchingStatus(): Map<String, Any> {
+    fun getFetchingStatus(): Map<String, Any> 
+    {
+        val subscriptions = marketDataService.getActiveSubscriptions()
+        val subscriptionList = subscriptions["subscriptions"] as? List<Map<String, Any>> ?: emptyList()
+        
+        val alphaVantageRics = subscriptionList.filter { 
+            (it["dataSource"] as? String ?: "ALPHA_VANTAGE") == "ALPHA_VANTAGE" 
+        }.map { it["ric"] as String }
+        
+        val allTickRics = subscriptionList.filter { 
+            (it["dataSource"] as? String ?: "ALPHA_VANTAGE") == "ALL_TICK" 
+        }.map { it["ric"] as String }
+        
         return mapOf(
-            "activeSubscriptions" to activeSubscriptions.size,
-            "subscriptions" to activeSubscriptions.values.map { subscription ->
-                mapOf(
-                    "ric" to subscription.ric,
-                    "dataSource" to subscription.dataSource,
-                    "intervals" to subscription.intervals,
-                    "isActive" to subscription.isActive
+            "fetchIntervalSeconds" to fetchIntervalSeconds,
+            "configuration" to mapOf(
+                "alphaVantageEnabled" to marketDataConfig.isAlphaVantageEnabled(),
+                "allTickEnabled" to marketDataConfig.isAllTickEnabled(),
+                "alphaVantageRicEndings" to marketDataConfig.alphaVantageRicEndings,
+                "allTickRicEndings" to marketDataConfig.allTickRicEndings
+            ),
+            "alphaVantageBatching" to mapOf(
+                "batchSize" to alphaVantageBatchSize,
+                "currentBatchIndex" to alphaVantageBatchIndex,
+                "totalRics" to alphaVantageRics.size,
+                "estimatedCyclesPerHour" to if (alphaVantageRics.isNotEmpty() && marketDataConfig.isAlphaVantageEnabled()) {
+                    (3600 / fetchIntervalSeconds) * alphaVantageBatchSize / alphaVantageRics.size
+                } else 0
+            ),
+            "dataSources" to mapOf(
+                "allTick" to mapOf(
+                    "enabled" to marketDataConfig.isAllTickEnabled(),
+                    "ricCount" to allTickRics.size
+                ),
+                "alphaVantage" to mapOf(
+                    "enabled" to marketDataConfig.isAlphaVantageEnabled(),
+                    "ricCount" to alphaVantageRics.size
                 )
-            },
-            "statistics" to mapOf(
-                "totalFetches" to totalFetches,
-                "successfulFetches" to successfulFetches,
-                "failedFetches" to failedFetches,
-                "successRate" to if (totalFetches > 0) (successfulFetches.toDouble() / totalFetches * 100) else 0.0
-            )
+            ),
+            "totalSubscriptions" to subscriptionList.size
         )
     }
 
-    /**
-     * Reset statistics
-     * Clears all fetching statistics
-     */
-    fun resetStatistics() {
-        totalFetches = 0L
-        successfulFetches = 0L
-        failedFetches = 0L
-        logger.info("Statistics reset")
-    }
-
-    /**
-     * Data class to hold subscription information for scheduled fetching
-     * Contains all necessary information for background data fetching
-     */
-    private data class SubscriptionInfo(
-        val ric: String,
-        val dataSource: DataSource,
-        val intervals: List<String>,
-        val isActive: Boolean
-    )
 }
+

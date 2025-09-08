@@ -5,7 +5,7 @@ import org.springframework.web.bind.annotation.*
 
 @CrossOrigin
 @RestController
-class HealthController()
+class HealthController() 
 {
     @GetMapping("/health")
     fun health(): ResponseEntity<String>
