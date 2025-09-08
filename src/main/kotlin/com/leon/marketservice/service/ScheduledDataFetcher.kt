@@ -48,6 +48,7 @@ class ScheduledDataFetcher(
         try 
         {
             val subscriptions = marketDataService.getActiveSubscriptions()
+            @Suppress("UNCHECKED_CAST")
             val subscriptionList = subscriptions["subscriptions"] as? List<Map<String, Any>> ?: emptyList()
             
             if (subscriptionList.isEmpty()) 
@@ -233,6 +234,7 @@ class ScheduledDataFetcher(
     fun getFetchingStatus(): Map<String, Any> 
     {
         val subscriptions = marketDataService.getActiveSubscriptions()
+        @Suppress("UNCHECKED_CAST")
         val subscriptionList = subscriptions["subscriptions"] as? List<Map<String, Any>> ?: emptyList()
         
         val alphaVantageRics = subscriptionList.filter { 

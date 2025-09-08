@@ -1,9 +1,9 @@
 package com.leon.marketservice.service
 
-import com.leon.marketservice.config.AmpsConfig
 import com.leon.marketservice.model.MarketData
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.util.concurrent.ConcurrentHashMap
 
@@ -19,13 +19,15 @@ import java.util.concurrent.ConcurrentHashMap
  * In a production environment, you would integrate with the actual AMPS client library.
  */
 @Service
-class AmpsPublisherService(
-    private val config: AmpsConfig,
-    private val objectMapper: ObjectMapper
-) 
+class AmpsPublisherService(private val objectMapper: ObjectMapper) 
 {
-    
     private val logger = LoggerFactory.getLogger(AmpsPublisherService::class.java)
+    
+    @Value("\${amps.server.url}")
+    private lateinit var serverUrl: String
+    
+    @Value("\${amps.topic.prefix}")
+    private lateinit var topicPrefix: String
     
     private var isConnected = false
     
@@ -41,7 +43,7 @@ class AmpsPublisherService(
     {
         try 
         {
-            logger.info("Initializing AMPS connection to ${config.serverUrl}")
+            logger.info("Initializing AMPS connection to $serverUrl")
             
             isConnected = true
             logger.info("Successfully connected to AMPS server (simulated)")
@@ -125,7 +127,7 @@ class AmpsPublisherService(
     private fun getTopicForRic(ric: String): String 
     {
         return topicCache.computeIfAbsent(ric) { 
-            "${config.topicPrefix}.${ric.replace(".", "_")}"
+            "$topicPrefix.${ric.replace(".", "_")}"
         }
     }
 
@@ -196,8 +198,8 @@ class AmpsPublisherService(
     {
         return mapOf(
             "connected" to isConnected,
-            "serverUrl" to config.serverUrl,
-            "topicPrefix" to config.topicPrefix,
+            "serverUrl" to serverUrl,
+            "topicPrefix" to topicPrefix,
             "cachedTopics" to topicCache.size
         )
     }

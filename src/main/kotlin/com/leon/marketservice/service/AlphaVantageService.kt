@@ -1,9 +1,9 @@
 package com.leon.marketservice.service
 
-import com.leon.marketservice.config.AlphaVantageConfig
 import com.leon.marketservice.model.DataSource
 import com.leon.marketservice.model.MarketData
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.WebClientResponseException
@@ -23,9 +23,15 @@ import java.time.format.DateTimeFormatter
  * a consistent interface for market data access.
  */
 @Service
-class AlphaVantageService(private val config: AlphaVantageConfig, private val webClient: WebClient)
+class AlphaVantageService(private val webClient: WebClient)
 {
     private val logger = LoggerFactory.getLogger(AlphaVantageService::class.java)
+    
+    @Value("\${alpha.vantage.api.key}")
+    private lateinit var apiKey: String
+    
+    @Value("\${alpha.vantage.base.url}")
+    private lateinit var baseUrl: String
 
     /**
      * Fetch market data for a specific stock (reactive)
@@ -145,9 +151,6 @@ class AlphaVantageService(private val config: AlphaVantageConfig, private val we
      */
     private fun buildApiUrl(function: String, symbol: String, interval: String): String 
     {
-        val baseUrl = config.baseUrl
-        val apiKey = config.apiKey
-        
         return when (function) 
         {
             "TIME_SERIES_INTRADAY" -> "$baseUrl?function=$function&symbol=$symbol&interval=$interval&apikey=$apiKey"
@@ -169,14 +172,13 @@ class AlphaVantageService(private val config: AlphaVantageConfig, private val we
     private fun parseResponse(response: Map<*, *>, ric: String, interval: String): MarketData 
     {
         val symbol = convertRicToSymbol(ric)
-        val currentTime = LocalDateTime.now()
         
         if (response.containsKey("Error Message"))
             throw Exception("Alpha Vantage API Error: ${response["Error Message"]}")
         
         if (response.containsKey("Note"))
             throw Exception("Alpha Vantage API Note: ${response["Note"]}")
-
+        
         val marketData = when
         {
             response.containsKey("Global Quote") -> parseGlobalQuote(response, ric, symbol, interval)

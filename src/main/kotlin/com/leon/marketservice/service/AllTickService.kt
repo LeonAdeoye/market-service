@@ -1,9 +1,9 @@
 package com.leon.marketservice.service
 
-import com.leon.marketservice.config.AllTickConfig
 import com.leon.marketservice.model.DataSource
 import com.leon.marketservice.model.MarketData
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.WebClientResponseException
@@ -21,10 +21,15 @@ import java.time.LocalDateTime
  * for real-time market data access.
  */
 @Service
-class AllTickService(private val config: AllTickConfig, private val webClient: WebClient)
+class AllTickService(private val webClient: WebClient)
 {
-    
     private val logger = LoggerFactory.getLogger(AllTickService::class.java)
+    
+    @Value("\${alltick.api.key}")
+    private lateinit var apiKey: String
+    
+    @Value("\${alltick.base.url}")
+    private lateinit var baseUrl: String
 
     /**
      * Fetch market data for a specific stock
@@ -46,7 +51,7 @@ class AllTickService(private val config: AllTickConfig, private val webClient: W
             logger.debug("Making API request to AllTick: $url")
             val response = webClient.get()
                 .uri(url)
-                .header("Authorization", "Bearer ${config.apiKey}")
+                .header("Authorization", "Bearer $apiKey")
                 .retrieve()
                 .bodyToMono(Map::class.java)
                 .block()
@@ -148,7 +153,6 @@ class AllTickService(private val config: AllTickConfig, private val webClient: W
      */
     private fun buildApiUrl(symbol: String): String 
     {
-        val baseUrl = config.baseUrl
         return "$baseUrl/v1/quote?symbol=$symbol"
     }
 
