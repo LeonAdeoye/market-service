@@ -25,13 +25,10 @@ class AmpsPublisherService(
 ) 
 {
     
-    // Logger for this service
     private val logger = LoggerFactory.getLogger(AmpsPublisherService::class.java)
     
-    // Connection status tracking
     private var isConnected = false
     
-    // Topic cache to avoid recreating topics
     private val topicCache = ConcurrentHashMap<String, String>()
 
     /**
@@ -46,8 +43,6 @@ class AmpsPublisherService(
         {
             logger.info("Initializing AMPS connection to ${config.serverUrl}")
             
-            // Simulate AMPS connection for demonstration
-            // In production, you would use the actual AMPS client
             isConnected = true
             logger.info("Successfully connected to AMPS server (simulated)")
             
@@ -80,8 +75,6 @@ class AmpsPublisherService(
             
             logger.debug("Publishing market data for ${marketData.ric} to topic $topic")
             
-            // Simulate AMPS publishing for demonstration
-            // In production, you would use the actual AMPS client
             logger.info("Simulated AMPS publish: ${marketData.ric} -> $topic")
             
             logger.debug("Successfully published market data for ${marketData.ric}")
@@ -147,7 +140,6 @@ class AmpsPublisherService(
     {
         val messageData = mutableMapOf<String, Any>()
         
-        // Set message fields
         messageData["ric"] = marketData.ric
         messageData["symbol"] = marketData.symbol
         messageData["price"] = marketData.price.toString()
@@ -155,13 +147,11 @@ class AmpsPublisherService(
         messageData["timestamp"] = marketData.timestamp.toString()
         messageData["interval"] = marketData.interval
         
-        // Add optional fields if present
         marketData.open?.let { messageData["open"] = it.toString() }
         marketData.high?.let { messageData["high"] = it.toString() }
         marketData.low?.let { messageData["low"] = it.toString() }
         marketData.volume?.let { messageData["volume"] = it.toString() }
         
-        // Add JSON payload for complex data
         val jsonPayload = objectMapper.writeValueAsString(marketData)
         messageData["jsonPayload"] = jsonPayload
         
@@ -187,7 +177,6 @@ class AmpsPublisherService(
     {
         try 
         {
-            // Simulate AMPS disconnection for demonstration
             isConnected = false
             logger.info("Disconnected from AMPS server (simulated)")
         } 

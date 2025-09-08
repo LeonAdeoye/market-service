@@ -23,15 +23,9 @@ import java.time.format.DateTimeFormatter
  * a consistent interface for market data access.
  */
 @Service
-class AlphaVantageService(
-    private val config: AlphaVantageConfig,
-    private val webClient: WebClient
-) 
+class AlphaVantageService(private val config: AlphaVantageConfig, private val webClient: WebClient)
 {
-    
-    // Logger for this service
     private val logger = LoggerFactory.getLogger(AlphaVantageService::class.java)
-    
 
     /**
      * Fetch market data for a specific stock (reactive)
@@ -45,18 +39,14 @@ class AlphaVantageService(
     {
         logger.debug("Fetching market data for $ric from Alpha Vantage")
         
-        // Convert RIC to Alpha Vantage symbol format
         val symbol = convertRicToSymbol(ric)
         
-        // Determine the appropriate Alpha Vantage function based on interval
         val function = determineFunction(interval)
         
-        // Build the API request URL
         val url = buildApiUrl(function, symbol, interval)
         
         logger.debug("Making API request to Alpha Vantage: $url")
         
-        // Make the reactive API call
         return webClient.get()
             .uri(url)
             .retrieve()
@@ -97,7 +87,6 @@ class AlphaVantageService(
     {
         return try 
         {
-            // Simple health check - try to fetch a well-known stock
             fetchMarketData("AAPL", "daily").block()
             true
         } 
@@ -179,25 +168,123 @@ class AlphaVantageService(
      */
     private fun parseResponse(response: Map<*, *>, ric: String, interval: String): MarketData 
     {
-        // This is a simplified parser - in a real implementation,
-        // you would need to handle the complex Alpha Vantage response structure
-        
         val symbol = convertRicToSymbol(ric)
         val currentTime = LocalDateTime.now()
         
-        // For demo purposes, return mock data
-        // In reality, you would parse the actual response structure
+        if (response.containsKey("Error Message"))
+            throw Exception("Alpha Vantage API Error: ${response["Error Message"]}")
+        
+        if (response.containsKey("Note"))
+            throw Exception("Alpha Vantage API Note: ${response["Note"]}")
+
+        val marketData = when
+        {
+            response.containsKey("Global Quote") -> parseGlobalQuote(response, ric, symbol, interval)
+            response.containsKey("Time Series (${interval})") -> parseTimeSeries(response, ric, symbol, interval, "Time Series (${interval})")
+            response.containsKey("Time Series (Daily)") -> parseTimeSeries(response, ric, symbol, interval, "Time Series (Daily)")
+            response.containsKey("Time Series (Weekly)") -> parseTimeSeries(response, ric, symbol, interval, "Time Series (Weekly)")
+            response.containsKey("Time Series (Monthly)") -> parseTimeSeries(response, ric, symbol, interval, "Time Series (Monthly)")
+            response.containsKey("Meta Data") -> parseTimeSeries(response, ric, symbol, interval, "Time Series (${interval})")
+            else -> throw Exception("Unknown Alpha Vantage response format for $ric")
+        }
+        
+        return marketData
+    }
+
+    private fun parseGlobalQuote(response: Map<*, *>, ric: String, symbol: String, interval: String): MarketData
+    {
+        val globalQuote = response["Global Quote"] as? Map<*, *>
+            ?: throw Exception("Invalid Global Quote format for $ric")
+        
+        val currentTime = LocalDateTime.now()
+        
+        val price = parseBigDecimal(globalQuote["05. price"] as? String) ?: BigDecimal.ZERO
+        if (price == BigDecimal.ZERO)
+            logger.warn("No price data found for $ric, using default value 0")
+        
         return MarketData(
             ric = ric,
             symbol = symbol,
-            price = BigDecimal("100.50"), // This would come from the actual response
-            open = BigDecimal("100.00"),
-            high = BigDecimal("101.00"),
-            low = BigDecimal("99.50"),
-            volume = 1000000L,
+            price = price,
+            open = parseBigDecimal(globalQuote["02. open"] as? String),
+            high = parseBigDecimal(globalQuote["03. high"] as? String),
+            low = parseBigDecimal(globalQuote["04. low"] as? String),
+            volume = parseLong(globalQuote["06. volume"] as? String),
             timestamp = currentTime,
             dataSource = DataSource.ALPHA_VANTAGE,
             interval = interval
         )
+    }
+
+    private fun parseTimeSeries(response: Map<*, *>, ric: String, symbol: String, interval: String, timeSeriesKey: String): MarketData
+    {
+        val timeSeries = response[timeSeriesKey] as? Map<*, *>
+            ?: throw Exception("Invalid Time Series format for $ric")
+        
+        val mostRecentEntry = timeSeries.entries.firstOrNull()
+            ?: throw Exception("No time series data found for $ric")
+        
+        val timestamp = mostRecentEntry.key as String
+        val data = mostRecentEntry.value as? Map<*, *>
+            ?: throw Exception("Invalid time series data format for $ric")
+        
+        val parsedTimestamp = try
+        {
+            LocalDateTime.parse(timestamp, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+        }
+        catch (e: Exception)
+        {
+            try
+            {
+                LocalDateTime.parse(timestamp, DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+            }
+            catch (e2: Exception)
+            {
+                LocalDateTime.now()
+            }
+        }
+        
+        val price = parseBigDecimal(data["4. close"] as? String) ?: parseBigDecimal(data["5. adjusted close"] as? String) ?: BigDecimal.ZERO
+        if (price == BigDecimal.ZERO)
+        {
+            logger.warn("No price data found for $ric, using default value 0")
+        }
+        
+        return MarketData(
+            ric = ric,
+            symbol = symbol,
+            price = price,
+            open = parseBigDecimal(data["1. open"] as? String),
+            high = parseBigDecimal(data["2. high"] as? String),
+            low = parseBigDecimal(data["3. low"] as? String),
+            volume = parseLong(data["5. volume"] as? String) ?: parseLong(data["6. volume"] as? String),
+            timestamp = parsedTimestamp,
+            dataSource = DataSource.ALPHA_VANTAGE,
+            interval = interval
+        )
+    }
+
+    private fun parseBigDecimal(value: String?): BigDecimal?
+    {
+        return try
+        {
+            value?.let { BigDecimal(it) }
+        }
+        catch (e: Exception)
+        {
+            null
+        }
+    }
+
+    private fun parseLong(value: String?): Long?
+    {
+        return try
+        {
+            value?.let { it.toLong() }
+        }
+        catch (e: Exception)
+        {
+            null
+        }
     }
 }

@@ -1,4 +1,4 @@
-package com.leon.marketservice.util
+ package com.leon.marketservice.util
 
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
@@ -13,10 +13,7 @@ import org.springframework.stereotype.Component
 @Component
 class RicValidator {
     
-    // Logger for this utility
     private val logger = LoggerFactory.getLogger(RicValidator::class.java)
-    
-    // RIC patterns for different exchanges
     private val ricPatterns = mapOf(
         "HK" to Regex("^\\d{4}\\.HK$"), // Hong Kong: 4 digits + .HK
         "T" to Regex("^\\d{4}\\.T$"),   // Japan: 4 digits + .T
@@ -40,7 +37,6 @@ class RicValidator {
         
         val upperRic = ric.uppercase()
         
-        // Check against all known patterns
         val isValid = ricPatterns.values.any { pattern ->
             pattern.matches(upperRic)
         }

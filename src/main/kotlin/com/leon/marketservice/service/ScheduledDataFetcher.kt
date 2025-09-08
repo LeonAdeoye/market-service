@@ -26,19 +26,15 @@ class ScheduledDataFetcher(
 ) 
 {
     
-    // Logger for this service
     private val logger = LoggerFactory.getLogger(ScheduledDataFetcher::class.java)
     
-    // Configurable fetch interval (default 30 seconds)
     @Value("\${market.data.scheduled.fetch.interval.seconds:30}")
     private var fetchIntervalSeconds: Long = 30
     
-    // Track active subscriptions for scheduled fetching
     private val activeSubscriptions = ConcurrentHashMap<String, SubscriptionInfo>()
     
-    // Alpha Vantage batching - track current batch index
     private var alphaVantageBatchIndex = 0
-    private val alphaVantageBatchSize = 5 // Respect 5 calls per minute limit
+    private val alphaVantageBatchSize = 5
 
     /**
      * Scheduled task that runs at configurable intervals
@@ -51,7 +47,6 @@ class ScheduledDataFetcher(
         
         try 
         {
-            // Get all active subscriptions
             val subscriptions = marketDataService.getActiveSubscriptions()
             val subscriptionList = subscriptions["subscriptions"] as? List<Map<String, Any>> ?: emptyList()
             
@@ -61,7 +56,6 @@ class ScheduledDataFetcher(
                 return
             }
             
-            // Extract RICs and group by data source
             val alphaVantageRics = mutableListOf<String>()
             val allTickRics = mutableListOf<String>()
             
@@ -75,14 +69,12 @@ class ScheduledDataFetcher(
                 }
             }
             
-            // Fetch AllTick data (all RICs at once - no rate limits)
             if (allTickRics.isNotEmpty() && marketDataConfig.isAllTickEnabled()) {
                 fetchAndPublishData(allTickRics, DataSource.ALL_TICK)
             } else if (allTickRics.isNotEmpty() && !marketDataConfig.isAllTickEnabled()) {
                 logger.warn("AllTick RICs found but AllTick is disabled (no RIC endings configured)")
             }
             
-            // Fetch Alpha Vantage data (batched to respect 5 calls/minute limit)
             if (alphaVantageRics.isNotEmpty() && marketDataConfig.isAlphaVantageEnabled()) {
                 fetchAlphaVantageBatch(alphaVantageRics)
             } else if (alphaVantageRics.isNotEmpty() && !marketDataConfig.isAlphaVantageEnabled()) {
@@ -107,15 +99,12 @@ class ScheduledDataFetcher(
         if (allRics.isEmpty()) 
             return
         
-        // Calculate batch boundaries
         val startIndex = alphaVantageBatchIndex % allRics.size
         val endIndex = minOf(startIndex + alphaVantageBatchSize, allRics.size)
         
-        // Get current batch of RICs
         val currentBatch = if (startIndex < endIndex) {
             allRics.subList(startIndex, endIndex)
         } else {
-            // Wrap around to beginning
             allRics.take(alphaVantageBatchSize)
         }
         
@@ -136,7 +125,6 @@ class ScheduledDataFetcher(
             logger.warn("Alpha Vantage unavailable, skipping batch of ${currentBatch.size} RICs")
         }
         
-        // Move to next batch for next scheduled run
         alphaVantageBatchIndex = (alphaVantageBatchIndex + alphaVantageBatchSize) % allRics.size
     }
 

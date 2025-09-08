@@ -21,17 +21,10 @@ import java.time.LocalDateTime
  * for real-time market data access.
  */
 @Service
-class AllTickService(
-    private val config: AllTickConfig,
-    private val webClient: WebClient
-) 
+class AllTickService(private val config: AllTickConfig, private val webClient: WebClient)
 {
     
-    // Logger for this service
     private val logger = LoggerFactory.getLogger(AllTickService::class.java)
-    
-    // Real-time data connection management would go here
-    // For now, we'll implement REST API calls
 
     /**
      * Fetch market data for a specific stock
@@ -48,15 +41,9 @@ class AllTickService(
         
         try 
         {
-            // Convert RIC to AllTick symbol format
             val symbol = convertRicToSymbol(ric)
-            
-            // Build the API request URL
             val url = buildApiUrl(symbol)
-            
             logger.debug("Making API request to AllTick: $url")
-            
-            // Make the API call
             val response = webClient.get()
                 .uri(url)
                 .header("Authorization", "Bearer ${config.apiKey}")
@@ -64,10 +51,11 @@ class AllTickService(
                 .bodyToMono(Map::class.java)
                 .block()
             
-            // Parse the response and convert to MarketData
             val marketData = if (response != null) {
                 parseResponse(response, ric, interval)
-            } else {
+            }
+            else
+            {
                 throw Exception("Received null response from AllTick API")
             }
             
@@ -97,7 +85,6 @@ class AllTickService(
     {
         return try 
         {
-            // Simple health check - try to fetch a well-known stock
             fetchMarketData("AAPL")
             true
         } 
@@ -144,8 +131,6 @@ class AllTickService(
      */
     private fun convertRicToSymbol(ric: String): String 
     {
-        // AllTick might use different symbol formats
-        // This is a placeholder - adjust based on actual AllTick API requirements
         return when 
         {
             ric.endsWith(".HK") -> ric.replace(".HK", ".HKEX")
@@ -176,28 +161,165 @@ class AllTickService(
      * @param interval The time interval
      * @return MarketData object
      */
-    @Suppress("UNUSED_PARAMETER")
     private fun parseResponse(response: Map<*, *>, ric: String, interval: String): MarketData 
     {
-        // This is a simplified parser - in a real implementation,
-        // you would need to handle the actual AllTick response structure
-        
         val symbol = convertRicToSymbol(ric)
+
+        
+        if (response.containsKey("error"))
+            throw Exception("AllTick API Error: ${response["error"]}")
+        
+        if (response.containsKey("message"))
+            throw Exception("AllTick API Message: ${response["message"]}")
+        
+        val marketData = when
+        {
+            response.containsKey("symbol") && response.containsKey("price") -> parseQuoteObject(response, ric, symbol, interval)
+            response.containsKey("quotes") -> parseQuotesArray(response, ric, symbol, interval)
+            response.containsKey("data") -> parseDataObject(response, ric, symbol, interval)
+            response.containsKey("last") || response.containsKey("close") || response.containsKey("current") -> parseDirectFields(response, ric, symbol, interval)
+            else -> throw Exception("Unknown AllTick response format for $ric: ${response.keys}")
+        }
+        
+        return marketData
+    }
+    
+    /**
+     * Parse single quote object format
+     */
+    private fun parseQuoteObject(response: Map<*, *>, ric: String, symbol: String, interval: String): MarketData
+    {
         val currentTime = LocalDateTime.now()
         
-        // For demo purposes, return mock data
-        // In reality, you would parse the actual response structure
+        val price = parseBigDecimal(response["price"] as? String) ?: parseBigDecimal(response["last"] as? String) ?: parseBigDecimal(response["close"] as? String) ?: BigDecimal.ZERO
+        if (price == BigDecimal.ZERO)
+            logger.warn("No price data found for $ric, using default value 0")
+        
         return MarketData(
             ric = ric,
             symbol = symbol,
-            price = BigDecimal("101.25"), // This would come from the actual response
-            open = BigDecimal("100.50"),
-            high = BigDecimal("102.00"),
-            low = BigDecimal("100.00"),
-            volume = 1500000L,
+            price = price,
+            open = parseBigDecimal(response["open"] as? String),
+            high = parseBigDecimal(response["high"] as? String),
+            low = parseBigDecimal(response["low"] as? String),
+            volume = parseLong(response["volume"] as? String),
             timestamp = currentTime,
             dataSource = DataSource.ALL_TICK,
             interval = interval
         )
+    }
+    
+    /**
+     * Parse quotes array format
+     */
+    private fun parseQuotesArray(response: Map<*, *>, ric: String, symbol: String, interval: String): MarketData
+    {
+        val quotes = response["quotes"] as? List<*>
+            ?: throw Exception("Invalid quotes array format for $ric")
+        
+        val firstQuote = quotes.firstOrNull() as? Map<*, *>
+            ?: throw Exception("No quotes found for $ric")
+        
+        val currentTime = LocalDateTime.now()
+        
+        val price = parseBigDecimal(firstQuote["price"] as? String) ?: parseBigDecimal(firstQuote["last"] as? String) ?: BigDecimal.ZERO
+        if (price == BigDecimal.ZERO)
+            logger.warn("No price data found for $ric, using default value 0")
+        
+        return MarketData(
+            ric = ric,
+            symbol = symbol,
+            price = price,
+            open = parseBigDecimal(firstQuote["open"] as? String),
+            high = parseBigDecimal(firstQuote["high"] as? String),
+            low = parseBigDecimal(firstQuote["low"] as? String),
+            volume = parseLong(firstQuote["volume"] as? String),
+            timestamp = currentTime,
+            dataSource = DataSource.ALL_TICK,
+            interval = interval
+        )
+    }
+    
+    /**
+     * Parse data object format
+     */
+    private fun parseDataObject(response: Map<*, *>, ric: String, symbol: String, interval: String): MarketData
+    {
+        val data = response["data"] as? Map<*, *>
+            ?: throw Exception("Invalid data object format for $ric")
+        
+        val currentTime = LocalDateTime.now()
+        
+        val price = parseBigDecimal(data["price"] as? String) ?: parseBigDecimal(data["last"] as? String) ?: BigDecimal.ZERO
+        if (price == BigDecimal.ZERO)
+            logger.warn("No price data found for $ric, using default value 0")
+        
+        return MarketData(
+            ric = ric,
+            symbol = symbol,
+            price = price,
+            open = parseBigDecimal(data["open"] as? String),
+            high = parseBigDecimal(data["high"] as? String),
+            low = parseBigDecimal(data["low"] as? String),
+            volume = parseLong(data["volume"] as? String),
+            timestamp = currentTime,
+            dataSource = DataSource.ALL_TICK,
+            interval = interval
+        )
+    }
+    
+    /**
+     * Parse direct fields format
+     */
+    private fun parseDirectFields(response: Map<*, *>, ric: String, symbol: String, interval: String): MarketData
+    {
+        val currentTime = LocalDateTime.now()
+        
+        val price = parseBigDecimal(response["last"] as? String) ?: parseBigDecimal(response["close"] as? String) ?: parseBigDecimal(response["current"] as? String) ?: BigDecimal.ZERO
+        if (price == BigDecimal.ZERO)
+            logger.warn("No price data found for $ric, using default value 0")
+        
+        return MarketData(
+            ric = ric,
+            symbol = symbol,
+            price = price,
+            open = parseBigDecimal(response["open"] as? String),
+            high = parseBigDecimal(response["high"] as? String),
+            low = parseBigDecimal(response["low"] as? String),
+            volume = parseLong(response["volume"] as? String),
+            timestamp = currentTime,
+            dataSource = DataSource.ALL_TICK,
+            interval = interval
+        )
+    }
+    
+    /**
+     * Safely parse BigDecimal from string
+     */
+    private fun parseBigDecimal(value: String?): BigDecimal?
+    {
+        return try
+        {
+            value?.let { BigDecimal(it) }
+        }
+        catch (e: Exception)
+        {
+            null
+        }
+    }
+    
+    /**
+     * Safely parse Long from string
+     */
+    private fun parseLong(value: String?): Long?
+    {
+        return try
+        {
+            value?.let { it.toLong() }
+        }
+        catch (e: Exception)
+        {
+            null
+        }
     }
 }

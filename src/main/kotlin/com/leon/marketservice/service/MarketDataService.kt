@@ -75,7 +75,7 @@ class MarketDataService(
 
     fun getSubscriptionStatus(): Map<String, Any> 
     {
-        val hkRics = subscriptions.values.filter {
+        val allTickRics = subscriptions.values.filter {
             try
             {
                 determineDataSourceByRic(it.ric) == DataSource.ALL_TICK
@@ -85,7 +85,7 @@ class MarketDataService(
                 false
             }
         }
-        val otherRics = subscriptions.values.filter { 
+        val alphaVantageRics = subscriptions.values.filter { 
             try
             {
                 determineDataSourceByRic(it.ric) == DataSource.ALPHA_VANTAGE
@@ -97,15 +97,13 @@ class MarketDataService(
         }
         
         return mapOf("totalSubscriptions" to subscriptions.size,
-            "hongKongStocks" to mapOf("count" to hkRics.size, "rics" to hkRics.map { it.ric }),
-            "otherMarkets" to mapOf("count" to otherRics.size, "rics" to otherRics.map { it.ric }))
+            "allTickRics" to mapOf("count" to allTickRics.size, "rics" to allTickRics.map { it.ric }),
+            "alphaVantageRics" to mapOf("count" to alphaVantageRics.size, "rics" to alphaVantageRics.map { it.ric }))
     }
 
     private fun determineDataSourceByRic(ric: String): DataSource 
     {
-        val dataSource = marketDataConfig.determineDataSource(ric)
-        
-        return when (dataSource) 
+        return when (val dataSource = marketDataConfig.determineDataSource(ric))
         {
             "ALL_TICK" -> DataSource.ALL_TICK
             "ALPHA_VANTAGE" -> DataSource.ALPHA_VANTAGE
