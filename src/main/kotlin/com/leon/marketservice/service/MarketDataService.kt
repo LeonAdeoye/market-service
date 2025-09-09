@@ -15,7 +15,6 @@ import java.util.concurrent.ConcurrentHashMap
 data class MarketDataConfig(var alphaVantageRicEndings: List<String> = emptyList(), var allTickRicEndings: List<String> = emptyList())
 {
     fun isAlphaVantageEnabled(): Boolean = alphaVantageRicEndings.isNotEmpty()
-    
     fun isAllTickEnabled(): Boolean = allTickRicEndings.isNotEmpty()
     
     fun determineDataSourceFromRicEnding(ric: String): String?

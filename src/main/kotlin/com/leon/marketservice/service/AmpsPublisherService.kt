@@ -25,7 +25,6 @@ class AmpsPublisherService(private val objectMapper: ObjectMapper)
             logger.info("Initializing AMPS connection to $serverUrl")
             isConnected = true
             logger.info("Successfully connected to AMPS server (simulated)")
-            
         } 
         catch (e: Exception) 
         {

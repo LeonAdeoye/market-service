@@ -92,34 +92,31 @@ class AllTickService(private val webClient: WebClient)
         return "$baseUrl/v1/quote?symbol=$symbol"
     }
 
-    private fun parseResponse(response: Map<*, *>, ric: String): MarketData 
-    {
+    private fun parseResponse(response: Map<*, *>, ric: String): MarketData {
         val symbol = convertRicToSymbol(ric)
 
         if (response.containsKey("error"))
             throw Exception("AllTick API Error: ${response["error"]}")
-        
+
         if (response.containsKey("message"))
             throw Exception("AllTick API Message: ${response["message"]}")
-        
+
         val currentTime = LocalDateTime.now()
-        
-        val price = parseDouble(response["price"] as? String) 
-            ?: parseDouble(response["last"] as? String) 
+
+        val price = parseDouble(response["price"] as? String)
+            ?: parseDouble(response["last"] as? String)
             ?: 0.0
-            
+
         if (price == 0.0)
             logger.warn("No price data found for $ric, using default value 0")
-        
-        val marketData = MarketData(
+
+        return MarketData(
             ric = ric,
             symbol = symbol,
             price = price,
             timestamp = currentTime,
             dataSource = DataSource.ALL_TICK
         )
-        
-        return marketData
     }
     
     
