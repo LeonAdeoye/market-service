@@ -3,6 +3,7 @@ package com.leon.marketservice.controller
 import com.leon.marketservice.model.SubscriptionRequest
 import com.leon.marketservice.model.SubscriptionResponse
 import com.leon.marketservice.service.MarketDataService
+import com.leon.marketservice.service.ScheduledDataFetcher
 import jakarta.validation.Valid
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -11,17 +12,10 @@ import org.springframework.web.bind.annotation.*
 
 @RestController
 @CrossOrigin
-class SubscriptionController(private val marketDataService: MarketDataService) 
+class SubscriptionController(private val marketDataService: MarketDataService, private val scheduledDataFetcher: ScheduledDataFetcher)
 {
     private val logger = LoggerFactory.getLogger(SubscriptionController::class.java)
 
-    /**
-     * Subscribe to market data for one or more stocks
-     * Creates a new subscription with the specified parameters
-     * 
-     * @param request The subscription request containing RICs, throttle time, and other parameters
-     * @return ResponseEntity containing the subscription response
-     */
     @PostMapping("/subscribe")
     fun subscribe(@Valid @RequestBody request: SubscriptionRequest): ResponseEntity<SubscriptionResponse> 
     {
@@ -40,13 +34,6 @@ class SubscriptionController(private val marketDataService: MarketDataService)
         }
     }
 
-    /**
-     * Unsubscribe from market data for a specific stock
-     * Removes the subscription for the specified RIC
-     * 
-     * @param ric The RIC code to unsubscribe from
-     * @return ResponseEntity with success/failure message
-     */
     @DeleteMapping("/unsubscribe/{ric}")
     fun unsubscribe(@PathVariable ric: String): ResponseEntity<Map<String, Any>> 
     {
@@ -64,12 +51,6 @@ class SubscriptionController(private val marketDataService: MarketDataService)
         }
     }
 
-    /**
-     * Get all active subscriptions
-     * Returns a list of all currently active subscriptions
-     * 
-     * @return ResponseEntity containing the list of subscriptions
-     */
     @GetMapping("/subscriptions")
     fun getSubscriptions(): ResponseEntity<Map<String, Any>> 
     {
@@ -84,6 +65,20 @@ class SubscriptionController(private val marketDataService: MarketDataService)
         {
             logger.error("Failed to retrieve subscriptions", e)
             ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(mapOf("error" to "Failed to retrieve subscriptions: ${e.message}"))
+        }
+    }
+
+    @PostMapping("/interval")
+    fun updateFetchInterval(@RequestParam("intervalSeconds") intervalSeconds: Long): ResponseEntity<String> 
+    {
+        return try
+        {
+            scheduledDataFetcher.updateFetchInterval(intervalSeconds)
+            ResponseEntity.ok("Updated to $intervalSeconds seconds")
+        }
+        catch (e: IllegalArgumentException)
+        {
+            ResponseEntity.badRequest().body("Invalid interval: ${e.message}")
         }
     }
 }

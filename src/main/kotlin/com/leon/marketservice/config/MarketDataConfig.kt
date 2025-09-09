@@ -11,7 +11,7 @@ data class MarketDataConfig(var alphaVantageRicEndings: List<String> = emptyList
     
     fun isAllTickEnabled(): Boolean = allTickRicEndings.isNotEmpty()
     
-    fun determineDataSource(ric: String): String? 
+    fun determineDataSourceFromRicEnding(ric: String): String?
     {
         for (ending in allTickRicEndings) 
         {

@@ -6,12 +6,10 @@ package com.leon.marketservice.model
  * 
  * @param ric Reuters Instrument Code for the security
  * @param dataSource The data source to use for fetching
- * @param intervals List of time intervals for data fetching
  * @param isActive Whether this subscription is currently active
  */
 data class SubscriptionInfo(
     val ric: String,
     val dataSource: DataSource,
-    val intervals: List<String>,
     val isActive: Boolean
 )

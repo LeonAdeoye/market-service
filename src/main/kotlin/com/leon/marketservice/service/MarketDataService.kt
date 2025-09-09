@@ -8,12 +8,8 @@ import org.springframework.stereotype.Service
 import java.util.concurrent.ConcurrentHashMap
 
 @Service
-class MarketDataService(
-    private val alphaVantageService: AlphaVantageService,
-    private val allTickService: AllTickService,
-    private val ampsPublisherService: AmpsPublisherService,
-    private val marketDataConfig: MarketDataConfig
-) 
+class MarketDataService(private val alphaVantageService: AlphaVantageService, private val allTickService: AllTickService,
+    private val ampsPublisherService: AmpsPublisherService, private val marketDataConfig: MarketDataConfig)
 {
     private val logger = LoggerFactory.getLogger(MarketDataService::class.java)
     private val subscriptions = ConcurrentHashMap<String, SubscriptionDetails>()
@@ -21,7 +17,6 @@ class MarketDataService(
     fun subscribe(request: SubscriptionRequest): SubscriptionResponse 
     {
         logger.info("Processing subscription request for ${request.rics.size} stocks")
-        
         val subscriptionId = generateSubscriptionId()
         val successfulRics = mutableListOf<String>()
         
@@ -30,7 +25,7 @@ class MarketDataService(
             try 
             {
                 val dataSource = determineDataSourceByRic(ric)
-                val subscriptionDetails = SubscriptionDetails(ric = ric, subscriptionId = subscriptionId, intervals = request.intervals)
+                val subscriptionDetails = SubscriptionDetails(ric = ric, subscriptionId = subscriptionId)
                 subscriptions[ric] = subscriptionDetails
                 successfulRics.add(ric)
                 logger.info("Successfully subscribed to $ric using $dataSource")
@@ -41,12 +36,9 @@ class MarketDataService(
             }
         }
         
-        return SubscriptionResponse(
-            success = successfulRics.isNotEmpty(),
+        return SubscriptionResponse(success = successfulRics.isNotEmpty(),
             message = if (successfulRics.isNotEmpty()) "Successfully subscribed to ${successfulRics.size} stocks" else "Failed to subscribe to any stocks",
-            subscriptionId = subscriptionId,
-            rics = successfulRics
-        )
+            subscriptionId = subscriptionId, rics = successfulRics)
     }
 
     fun unsubscribe(ric: String) 
@@ -66,8 +58,7 @@ class MarketDataService(
             "subscriptions" to subscriptions.values.map { subscription ->
                 mapOf(
                     "ric" to subscription.ric,
-                    "subscriptionId" to subscription.subscriptionId,
-                    "intervals" to subscription.intervals
+                    "subscriptionId" to subscription.subscriptionId
                 )
             }
         )
@@ -103,7 +94,7 @@ class MarketDataService(
 
     private fun determineDataSourceByRic(ric: String): DataSource 
     {
-        return when (val dataSource = marketDataConfig.determineDataSource(ric))
+        return when (val dataSource = marketDataConfig.determineDataSourceFromRicEnding(ric))
         {
             "ALL_TICK" -> DataSource.ALL_TICK
             "ALPHA_VANTAGE" -> DataSource.ALPHA_VANTAGE
