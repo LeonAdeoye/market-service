@@ -79,6 +79,7 @@ class MarketDataService(private val alphaVantageService: AlphaVantageService, pr
     {
         logger.info("Unsubscribing from $ric")
         val subscription = subscriptions.remove(ric)
+
         if (subscription != null)
             logger.info("Successfully unsubscribed from $ric")
         else
@@ -90,10 +91,7 @@ class MarketDataService(private val alphaVantageService: AlphaVantageService, pr
         return mapOf(
             "count" to subscriptions.size,
             "subscriptions" to subscriptions.values.map { subscription ->
-                mapOf(
-                    "ric" to subscription.ric,
-                    "subscriptionId" to subscription.subscriptionId
-                )
+                mapOf("ric" to subscription.ric, "subscriptionId" to subscription.subscriptionId)
             }
         )
     }
