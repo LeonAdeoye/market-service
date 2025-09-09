@@ -1,6 +1,5 @@
 package com.leon.marketservice.service
 
-import com.leon.marketservice.config.MarketDataConfig
 import com.leon.marketservice.model.DataSource
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled

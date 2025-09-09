@@ -1,11 +1,46 @@
 package com.leon.marketservice.service
 
-import com.leon.marketservice.config.MarketDataConfig
 import com.leon.marketservice.model.*
 import com.leon.marketservice.model.SubscriptionDetails
 import org.slf4j.LoggerFactory
+import org.springframework.boot.context.properties.ConfigurationProperties
+import org.springframework.context.annotation.Bean
+import org.springframework.stereotype.Component
 import org.springframework.stereotype.Service
+import org.springframework.web.reactive.function.client.WebClient
 import java.util.concurrent.ConcurrentHashMap
+
+@Component
+@ConfigurationProperties(prefix = "market.data")
+data class MarketDataConfig(var alphaVantageRicEndings: List<String> = emptyList(), var allTickRicEndings: List<String> = emptyList())
+{
+    fun isAlphaVantageEnabled(): Boolean = alphaVantageRicEndings.isNotEmpty()
+    
+    fun isAllTickEnabled(): Boolean = allTickRicEndings.isNotEmpty()
+    
+    fun determineDataSourceFromRicEnding(ric: String): String?
+    {
+        for (ending in allTickRicEndings) 
+        {
+            if (ric.endsWith(ending))
+                return "ALL_TICK"
+        }
+
+        for (ending in alphaVantageRicEndings) 
+        {
+            if (ric.endsWith(ending))
+                return "ALPHA_VANTAGE"
+        }
+
+        return null
+    }
+    
+    @Bean
+    fun webClient(): WebClient 
+    {
+        return WebClient.builder().build()
+    }
+}
 
 @Service
 class MarketDataService(private val alphaVantageService: AlphaVantageService, private val allTickService: AllTickService,
