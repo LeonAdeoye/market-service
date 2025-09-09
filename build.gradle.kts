@@ -44,3 +44,13 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
         jvmTarget = "17"
     }
 }
+
+// Ensure the JAR is executable
+tasks.jar {
+    enabled = false
+}
+
+tasks.bootJar {
+    archiveBaseName.set("market-service")
+    archiveVersion.set("")
+}
