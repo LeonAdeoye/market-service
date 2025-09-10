@@ -16,12 +16,7 @@ import com.fasterxml.jackson.annotation.JsonProperty
 @Component
 @ConfigurationProperties(prefix = "market.data")
 @EnableConfigurationProperties
-data class MarketDataConfig(
-    @field:JsonProperty("alpha.vantage.ric.endings")
-    var alphaVantageRicEndings: List<String> = emptyList(), 
-    @field:JsonProperty("alltick.ric.endings")
-    var allTickRicEndings: List<String> = emptyList()
-)
+data class MarketDataConfig(var alphaVantageRicEndings: List<String> = emptyList(), var allTickRicEndings: List<String> = emptyList())
 {
     private val logger = LoggerFactory.getLogger(MarketDataConfig::class.java)
     
