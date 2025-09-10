@@ -4,33 +4,61 @@ import com.leon.marketservice.model.*
 import com.leon.marketservice.model.SubscriptionDetails
 import org.slf4j.LoggerFactory
 import org.springframework.boot.context.properties.ConfigurationProperties
+import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.stereotype.Component
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
 import java.util.concurrent.ConcurrentHashMap
+import jakarta.annotation.PostConstruct
+import com.fasterxml.jackson.annotation.JsonProperty
 
 @Component
 @ConfigurationProperties(prefix = "market.data")
-data class MarketDataConfig(var alphaVantageRicEndings: List<String> = emptyList(), var allTickRicEndings: List<String> = emptyList())
+@EnableConfigurationProperties
+data class MarketDataConfig(
+    @field:JsonProperty("alpha.vantage.ric.endings")
+    var alphaVantageRicEndings: List<String> = emptyList(), 
+    @field:JsonProperty("alltick.ric.endings")
+    var allTickRicEndings: List<String> = emptyList()
+)
 {
+    private val logger = LoggerFactory.getLogger(MarketDataConfig::class.java)
+    
     fun isAlphaVantageEnabled(): Boolean = alphaVantageRicEndings.isNotEmpty()
     fun isAllTickEnabled(): Boolean = allTickRicEndings.isNotEmpty()
     
+    @PostConstruct
+    fun logConfiguration()
+    {
+        logger.info("MarketDataConfig initialized with:")
+        logger.info("  AllTick RIC endings: $allTickRicEndings")
+        logger.info("  Alpha Vantage RIC endings: $alphaVantageRicEndings")
+    }
+    
     fun determineDataSourceFromRicEnding(ric: String): String?
     {
+        logger.debug("Checking RIC '$ric' against AllTick endings: $allTickRicEndings")
         for (ending in allTickRicEndings) 
         {
             if (ric.endsWith(ending))
+            {
+                logger.debug("RIC '$ric' matches AllTick ending '$ending'")
                 return "ALL_TICK"
+            }
         }
 
+        logger.debug("Checking RIC '$ric' against Alpha Vantage endings: $alphaVantageRicEndings")
         for (ending in alphaVantageRicEndings) 
         {
             if (ric.endsWith(ending))
+            {
+                logger.debug("RIC '$ric' matches Alpha Vantage ending '$ending'")
                 return "ALPHA_VANTAGE"
+            }
         }
 
+        logger.debug("RIC '$ric' does not match any configured endings")
         return null
     }
     
@@ -51,6 +79,8 @@ class MarketDataService(private val alphaVantageService: AlphaVantageService, pr
     fun subscribe(request: SubscriptionRequest): SubscriptionResponse 
     {
         logger.info("Processing subscription request for ${request.rics.size} stocks")
+        logger.debug("AllTick RIC endings: ${marketDataConfig.allTickRicEndings}")
+        logger.debug("Alpha Vantage RIC endings: ${marketDataConfig.alphaVantageRicEndings}")
         val subscriptionId = generateSubscriptionId()
         val successfulRics = mutableListOf<String>()
         
@@ -58,6 +88,7 @@ class MarketDataService(private val alphaVantageService: AlphaVantageService, pr
         {
             try 
             {
+                logger.debug("Processing RIC: $ric")
                 val dataSource = determineDataSourceByRic(ric)
                 val subscriptionDetails = SubscriptionDetails(ric = ric, subscriptionId = subscriptionId)
                 subscriptions[ric] = subscriptionDetails
@@ -137,6 +168,16 @@ class MarketDataService(private val alphaVantageService: AlphaVantageService, pr
             }
             else -> throw IllegalArgumentException("Unknown data source: $dataSource")
         }
+    }
+
+    fun getConfiguration(): Map<String, Any> 
+    {
+        return mapOf(
+            "alphaVantageRicEndings" to marketDataConfig.alphaVantageRicEndings,
+            "allTickRicEndings" to marketDataConfig.allTickRicEndings,
+            "alphaVantageEnabled" to marketDataConfig.isAlphaVantageEnabled(),
+            "allTickEnabled" to marketDataConfig.isAllTickEnabled()
+        )
     }
 
     private fun generateSubscriptionId(): String 

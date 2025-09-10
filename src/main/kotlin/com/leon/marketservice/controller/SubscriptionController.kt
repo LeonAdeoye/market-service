@@ -81,4 +81,20 @@ class SubscriptionController(private val marketDataService: MarketDataService, p
             ResponseEntity.badRequest().body("Invalid interval: ${e.message}")
         }
     }
+
+    @GetMapping("/config")
+    fun getConfiguration(): ResponseEntity<Map<String, Any>> 
+    {
+        logger.info("Received request for configuration")
+        return try
+        {
+            val config = marketDataService.getConfiguration()
+            ResponseEntity.ok(config)
+        }
+        catch (e: Exception)
+        {
+            logger.error("Failed to retrieve configuration", e)
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(mapOf("error" to "Failed to retrieve configuration: ${e.message}"))
+        }
+    }
 }
