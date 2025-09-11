@@ -1,13 +1,12 @@
 package com.leon.marketservice.service
 
-import com.leon.marketservice.model.DataSource
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 
 @Service
 class ScheduledDataFetcher( private val marketDataService: MarketDataService, private val alphaVantageService: AlphaVantageService,
-    private val ampsPublisherService: AmpsPublisherService, private val marketDataConfig: MarketDataConfig)
+    private val ampsPublisherService: AmpsPublisherService)
 {
     private val logger = LoggerFactory.getLogger(ScheduledDataFetcher::class.java)
     private var alphaVantageBatchIndex = 0
@@ -29,18 +28,11 @@ class ScheduledDataFetcher( private val marketDataService: MarketDataService, pr
             for (subscription in subscriptionList)
             {
                 val ric = subscription["ric"] as String
-                val dataSource = subscription["dataSource"] as? String ?: "ALPHA_VANTAGE"
-                when (DataSource.valueOf(dataSource))
-                {
-                    DataSource.ALPHA_VANTAGE -> alphaVantageRics.add(ric)
-                }
+                alphaVantageRics.add(ric)
             }
             
-            
-            if (alphaVantageRics.isNotEmpty() && marketDataConfig.isAlphaVantageEnabled())
+            if (alphaVantageRics.isNotEmpty())
                 fetchAlphaVantageBatch(alphaVantageRics)
-            else if (alphaVantageRics.isNotEmpty() && !marketDataConfig.isAlphaVantageEnabled())
-                logger.warn("Alpha Vantage RICs found but Alpha Vantage is disabled (no RIC endings configured)")
             
         } 
         catch (e: Exception) 
@@ -68,7 +60,6 @@ class ScheduledDataFetcher( private val marketDataService: MarketDataService, pr
         alphaVantageBatchIndex = (alphaVantageBatchIndex + alphaVantageBatchSize) % allRics.size
     }
 
-
     fun updateFetchInterval(intervalSeconds: Long) 
     {
         if (intervalSeconds < 1)
@@ -77,4 +68,3 @@ class ScheduledDataFetcher( private val marketDataService: MarketDataService, pr
         logger.info("Updated fetch interval to $intervalSeconds seconds")
     }
 }
-

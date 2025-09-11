@@ -14,8 +14,5 @@ data class MarketData(
     val price: Double,
     
     @field:JsonProperty("timestamp")
-    val timestamp: LocalDateTime,
-    
-    @field:JsonProperty("dataSource")
-    val dataSource: DataSource
+    val timestamp: LocalDateTime
 )

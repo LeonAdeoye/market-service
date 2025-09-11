@@ -1,6 +1,5 @@
 package com.leon.marketservice.service
 
-import com.leon.marketservice.model.DataSource
 import com.leon.marketservice.model.MarketData
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
@@ -99,8 +98,7 @@ class AlphaVantageService(private val webClient: WebClient)
             ric = ric,
             symbol = symbol,
             price = price,
-            timestamp = currentTime,
-            dataSource = DataSource.ALPHA_VANTAGE
+            timestamp = currentTime
         )
     }
 

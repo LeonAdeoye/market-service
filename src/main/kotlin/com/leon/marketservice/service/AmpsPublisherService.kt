@@ -69,7 +69,7 @@ class AmpsPublisherService(private val objectMapper: ObjectMapper)
         messageData["ric"] = marketData.ric
         messageData["symbol"] = marketData.symbol
         messageData["price"] = marketData.price.toString()
-        messageData["dataSource"] = marketData.dataSource.name
+        messageData["dataSource"] = "Alpha Vantage"
         messageData["timestamp"] = marketData.timestamp.toString()
         val jsonPayload = objectMapper.writeValueAsString(marketData)
         messageData["jsonPayload"] = jsonPayload
