@@ -16,32 +16,21 @@ import com.fasterxml.jackson.annotation.JsonProperty
 @Component
 @ConfigurationProperties(prefix = "market.data")
 @EnableConfigurationProperties
-data class MarketDataConfig(var alphaVantageRicEndings: List<String> = emptyList(), var allTickRicEndings: List<String> = emptyList())
+data class MarketDataConfig(var alphaVantageRicEndings: List<String> = emptyList())
 {
     private val logger = LoggerFactory.getLogger(MarketDataConfig::class.java)
     
     fun isAlphaVantageEnabled(): Boolean = alphaVantageRicEndings.isNotEmpty()
-    fun isAllTickEnabled(): Boolean = allTickRicEndings.isNotEmpty()
     
     @PostConstruct
     fun logConfiguration()
     {
         logger.info("MarketDataConfig initialized with:")
-        logger.info("  AllTick RIC endings: $allTickRicEndings")
         logger.info("  Alpha Vantage RIC endings: $alphaVantageRicEndings")
     }
     
     fun determineDataSourceFromRicEnding(ric: String): String?
     {
-        logger.debug("Checking RIC '$ric' against AllTick endings: $allTickRicEndings")
-        for (ending in allTickRicEndings) 
-        {
-            if (ric.endsWith(ending))
-            {
-                logger.debug("RIC '$ric' matches AllTick ending '$ending'")
-                return "ALL_TICK"
-            }
-        }
 
         logger.debug("Checking RIC '$ric' against Alpha Vantage endings: $alphaVantageRicEndings")
         for (ending in alphaVantageRicEndings) 
@@ -65,7 +54,7 @@ data class MarketDataConfig(var alphaVantageRicEndings: List<String> = emptyList
 }
 
 @Service
-class MarketDataService(private val alphaVantageService: AlphaVantageService, private val allTickService: AllTickService,
+class MarketDataService(private val alphaVantageService: AlphaVantageService,
     private val ampsPublisherService: AmpsPublisherService, private val marketDataConfig: MarketDataConfig)
 {
     private val logger = LoggerFactory.getLogger(MarketDataService::class.java)
@@ -74,7 +63,6 @@ class MarketDataService(private val alphaVantageService: AlphaVantageService, pr
     fun subscribe(request: SubscriptionRequest): SubscriptionResponse 
     {
         logger.info("Processing subscription request for ${request.rics.size} stocks")
-        logger.debug("AllTick RIC endings: ${marketDataConfig.allTickRicEndings}")
         logger.debug("Alpha Vantage RIC endings: ${marketDataConfig.alphaVantageRicEndings}")
         val subscriptionId = generateSubscriptionId()
         val successfulRics = mutableListOf<String>()
@@ -124,16 +112,6 @@ class MarketDataService(private val alphaVantageService: AlphaVantageService, pr
 
     fun getSubscriptionStatus(): Map<String, Any> 
     {
-        val allTickRics = subscriptions.values.filter {
-            try
-            {
-                determineDataSourceByRic(it.ric) == DataSource.ALL_TICK
-            }
-            catch (e: Exception)
-            {
-                false
-            }
-        }
         val alphaVantageRics = subscriptions.values.filter { 
             try
             {
@@ -146,7 +124,6 @@ class MarketDataService(private val alphaVantageService: AlphaVantageService, pr
         }
         
         return mapOf("totalSubscriptions" to subscriptions.size,
-            "allTickRics" to mapOf("count" to allTickRics.size, "rics" to allTickRics.map { it.ric }),
             "alphaVantageRics" to mapOf("count" to alphaVantageRics.size, "rics" to alphaVantageRics.map { it.ric }))
     }
 
@@ -154,11 +131,10 @@ class MarketDataService(private val alphaVantageService: AlphaVantageService, pr
     {
         return when (val dataSource = marketDataConfig.determineDataSourceFromRicEnding(ric))
         {
-            "ALL_TICK" -> DataSource.ALL_TICK
             "ALPHA_VANTAGE" -> DataSource.ALPHA_VANTAGE
             null -> 
             {
-                val availableEndings = marketDataConfig.alphaVantageRicEndings + marketDataConfig.allTickRicEndings
+                val availableEndings = marketDataConfig.alphaVantageRicEndings
                 throw IllegalArgumentException("RIC '$ric' does not match any configured endings. Available endings: ${availableEndings.joinToString()}")
             }
             else -> throw IllegalArgumentException("Unknown data source: $dataSource")
@@ -169,9 +145,7 @@ class MarketDataService(private val alphaVantageService: AlphaVantageService, pr
     {
         return mapOf(
             "alphaVantageRicEndings" to marketDataConfig.alphaVantageRicEndings,
-            "allTickRicEndings" to marketDataConfig.allTickRicEndings,
-            "alphaVantageEnabled" to marketDataConfig.isAlphaVantageEnabled(),
-            "allTickEnabled" to marketDataConfig.isAllTickEnabled()
+            "alphaVantageEnabled" to marketDataConfig.isAlphaVantageEnabled()
         )
     }
 

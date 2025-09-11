@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service
 
 @Service
 class ScheduledDataFetcher( private val marketDataService: MarketDataService, private val alphaVantageService: AlphaVantageService,
-    private val allTickService: AllTickService,  private val ampsPublisherService: AmpsPublisherService, private val marketDataConfig: MarketDataConfig)
+    private val ampsPublisherService: AmpsPublisherService, private val marketDataConfig: MarketDataConfig)
 {
     private val logger = LoggerFactory.getLogger(ScheduledDataFetcher::class.java)
     private var alphaVantageBatchIndex = 0
@@ -25,7 +25,6 @@ class ScheduledDataFetcher( private val marketDataService: MarketDataService, pr
                 return
             
             val alphaVantageRics = mutableListOf<String>()
-            val allTickRics = mutableListOf<String>()
             
             for (subscription in subscriptionList)
             {
@@ -34,14 +33,9 @@ class ScheduledDataFetcher( private val marketDataService: MarketDataService, pr
                 when (DataSource.valueOf(dataSource))
                 {
                     DataSource.ALPHA_VANTAGE -> alphaVantageRics.add(ric)
-                    DataSource.ALL_TICK -> allTickRics.add(ric)
                 }
             }
             
-            if (allTickRics.isNotEmpty() && marketDataConfig.isAllTickEnabled())
-                fetchAllTickData(allTickRics)
-            else if (allTickRics.isNotEmpty() && !marketDataConfig.isAllTickEnabled())
-                logger.warn("AllTick RICs found but AllTick is disabled (no RIC endings configured)")
             
             if (alphaVantageRics.isNotEmpty() && marketDataConfig.isAlphaVantageEnabled())
                 fetchAlphaVantageBatch(alphaVantageRics)
@@ -74,18 +68,6 @@ class ScheduledDataFetcher( private val marketDataService: MarketDataService, pr
         alphaVantageBatchIndex = (alphaVantageBatchIndex + alphaVantageBatchSize) % allRics.size
     }
 
-    private fun fetchAllTickData(rics: List<String>) 
-    {
-        logger.debug("Fetching data for ${rics.size} RICs using AllTick")
-        allTickService.fetchMarketDataForSymbols(rics).subscribe(
-        {
-            marketData -> ampsPublisherService.publishMarketData(marketData)
-            logger.debug("Published AllTick data for ${marketData.ric}")
-        },
-        {
-            error -> logger.error("Error fetching AllTick data", error)
-        })
-    }
 
     fun updateFetchInterval(intervalSeconds: Long) 
     {
