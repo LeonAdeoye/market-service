@@ -114,5 +114,14 @@ class AlphaVantageService(private val webClient: WebClient)
             null
         }
     }
+    
+    fun getConfiguration(): Map<String, Any>
+    {
+        return mapOf(
+            "dataSource" to "Alpha Vantage",
+            "baseUrl" to baseUrl,
+            "enabled" to true
+        )
+    }
 
 }
