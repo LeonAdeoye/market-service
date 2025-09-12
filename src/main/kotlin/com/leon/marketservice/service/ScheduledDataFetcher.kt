@@ -6,7 +6,7 @@ import org.springframework.stereotype.Service
 
 @Service
 class ScheduledDataFetcher( private val marketDataService: MarketDataService, private val alphaVantageService: AlphaVantageService,
-    private val ampsPublisherService: AmpsPublisherService)
+    private val gaussianRandomDataService: GaussianRandomDataService, private val ampsPublisherService: AmpsPublisherService)
 {
     private val logger = LoggerFactory.getLogger(ScheduledDataFetcher::class.java)
     private var alphaVantageBatchIndex = 0
@@ -24,15 +24,30 @@ class ScheduledDataFetcher( private val marketDataService: MarketDataService, pr
                 return
             
             val alphaVantageRics = mutableListOf<String>()
+            val gaussianRandomRics = mutableListOf<String>()
             
             for (subscription in subscriptionList)
             {
                 val ric = subscription["ric"] as String
-                alphaVantageRics.add(ric)
+                val dataSource = subscription["dataSource"] as? String ?: "alpha-vantage"
+                
+                when (dataSource)
+                {
+                    "alpha-vantage" -> alphaVantageRics.add(ric)
+                    "gaussian-random" -> gaussianRandomRics.add(ric)
+                    else -> 
+                    {
+                        logger.warn("Unknown data source '$dataSource' for RIC $ric, defaulting to Alpha Vantage")
+                        alphaVantageRics.add(ric)
+                    }
+                }
             }
             
             if (alphaVantageRics.isNotEmpty())
                 fetchAlphaVantageBatch(alphaVantageRics)
+            
+            if (gaussianRandomRics.isNotEmpty())
+                fetchGaussianRandomBatch(gaussianRandomRics)
             
         } 
         catch (e: Exception) 
@@ -58,6 +73,20 @@ class ScheduledDataFetcher( private val marketDataService: MarketDataService, pr
         })
 
         alphaVantageBatchIndex = (alphaVantageBatchIndex + alphaVantageBatchSize) % allRics.size
+    }
+    
+    private fun fetchGaussianRandomBatch(allRics: List<String>) 
+    {
+        logger.debug("Fetching Gaussian random batch: ${allRics.size} RICs (${allRics.joinToString()})")
+
+        gaussianRandomDataService.generateMarketDataForSymbols(allRics).subscribe(
+        {
+            marketData -> ampsPublisherService.publishMarketData(marketData)
+            logger.debug("Published Gaussian random data for ${marketData.ric}")
+        },
+        {
+            error -> logger.error("Error fetching Gaussian random batch", error)
+        })
     }
 
     fun updateFetchInterval(intervalSeconds: Long) 

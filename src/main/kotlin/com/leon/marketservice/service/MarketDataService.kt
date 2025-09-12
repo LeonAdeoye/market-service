@@ -21,14 +21,21 @@ class WebClientConfig
 
 @Service
 class MarketDataService(private val alphaVantageService: AlphaVantageService,
+    private val gaussianRandomDataService: GaussianRandomDataService,
     private val ampsPublisherService: AmpsPublisherService)
 {
     private val logger = LoggerFactory.getLogger(MarketDataService::class.java)
     private val subscriptions = ConcurrentHashMap<String, SubscriptionDetails>()
+    private val dataSourceType = ConcurrentHashMap<String, String>() // RIC -> data source type
 
     fun subscribe(request: SubscriptionRequest): SubscriptionResponse 
     {
-        logger.info("Processing subscription request for ${request.rics.size} stocks")
+        return subscribe(request, "alpha-vantage")
+    }
+    
+    fun subscribe(request: SubscriptionRequest, dataSource: String): SubscriptionResponse 
+    {
+        logger.info("Processing subscription request for ${request.rics.size} stocks using $dataSource")
         val subscriptionId = generateSubscriptionId()
         val successfulRics = mutableListOf<String>()
         
@@ -36,11 +43,12 @@ class MarketDataService(private val alphaVantageService: AlphaVantageService,
         {
             try 
             {
-                logger.debug("Processing RIC: $ric")
+                logger.debug("Processing RIC: $ric with data source: $dataSource")
                 val subscriptionDetails = SubscriptionDetails(ric = ric, subscriptionId = subscriptionId)
                 subscriptions[ric] = subscriptionDetails
+                dataSourceType[ric] = dataSource
                 successfulRics.add(ric)
-                logger.info("Successfully subscribed to $ric using Alpha Vantage")
+                logger.info("Successfully subscribed to $ric using $dataSource")
             } 
             catch (e: Exception) 
             {
@@ -49,7 +57,7 @@ class MarketDataService(private val alphaVantageService: AlphaVantageService,
         }
         
         return SubscriptionResponse(success = successfulRics.isNotEmpty(),
-            message = if (successfulRics.isNotEmpty()) "Successfully subscribed to ${successfulRics.size} stocks" else "Failed to subscribe to any stocks",
+            message = if (successfulRics.isNotEmpty()) "Successfully subscribed to ${successfulRics.size} stocks using $dataSource" else "Failed to subscribe to any stocks",
             subscriptionId = subscriptionId, rics = successfulRics)
     }
 
@@ -57,9 +65,15 @@ class MarketDataService(private val alphaVantageService: AlphaVantageService,
     {
         logger.info("Unsubscribing from $ric")
         val subscription = subscriptions.remove(ric)
+        val dataSource = dataSourceType.remove(ric)
 
         if (subscription != null)
-            logger.info("Successfully unsubscribed from $ric")
+        {
+            logger.info("Successfully unsubscribed from $ric (was using $dataSource)")
+            // Reset price history for Gaussian random data source
+            if (dataSource == "gaussian-random")
+                gaussianRandomDataService.resetPrice(ric)
+        }
         else
             logger.warn("No active subscription found for $ric")
     }
@@ -69,23 +83,34 @@ class MarketDataService(private val alphaVantageService: AlphaVantageService,
         return mapOf(
             "count" to subscriptions.size,
             "subscriptions" to subscriptions.values.map { subscription ->
-                mapOf("ric" to subscription.ric, "subscriptionId" to subscription.subscriptionId)
+                mapOf<String, Any>(
+                    "ric" to subscription.ric, 
+                    "subscriptionId" to subscription.subscriptionId,
+                    "dataSource" to (dataSourceType[subscription.ric] ?: "unknown")
+                )
             }
         )
     }
 
     fun getSubscriptionStatus(): Map<String, Any> 
     {
-        val alphaVantageRics = subscriptions.values.toList()
+        val alphaVantageRics = subscriptions.values.filter { dataSourceType[it.ric] == "alpha-vantage" }
+        val gaussianRandomRics = subscriptions.values.filter { dataSourceType[it.ric] == "gaussian-random" }
         
-        return mapOf("totalSubscriptions" to subscriptions.size,
-            "alphaVantageRics" to mapOf("count" to alphaVantageRics.size, "rics" to alphaVantageRics.map { it.ric }))
+        return mapOf(
+            "totalSubscriptions" to subscriptions.size,
+            "alphaVantageRics" to mapOf("count" to alphaVantageRics.size, "rics" to alphaVantageRics.map { it.ric }),
+            "gaussianRandomRics" to mapOf("count" to gaussianRandomRics.size, "rics" to gaussianRandomRics.map { it.ric })
+        )
     }
 
     fun getConfiguration(): Map<String, Any> 
     {
         return mapOf(
-            "dataSource" to "Alpha Vantage",
+            "dataSources" to mapOf(
+                "alphaVantage" to alphaVantageService.getConfiguration(),
+                "gaussianRandom" to gaussianRandomDataService.getConfiguration()
+            ),
             "enabled" to true
         )
     }

@@ -36,6 +36,11 @@ dependencies {
     
     // HTTP Client
     implementation("org.springframework.boot:spring-boot-starter-webflux")
+    
+    // Test Dependencies
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testImplementation("io.mockk:mockk:1.13.8")
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
