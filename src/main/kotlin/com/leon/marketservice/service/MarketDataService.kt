@@ -20,9 +20,7 @@ class WebClientConfig
 }
 
 @Service
-class MarketDataService(private val alphaVantageService: AlphaVantageService,
-    private val gaussianRandomDataService: GaussianRandomDataService,
-    private val ampsPublisherService: AmpsPublisherService)
+class MarketDataService(private val alphaVantageService: AlphaVantageService, private val gaussianRandomDataService: GaussianRandomDataService, private val ampsPublisherService: AmpsPublisherService)
 {
     private val logger = LoggerFactory.getLogger(MarketDataService::class.java)
     private val subscriptions = ConcurrentHashMap<String, SubscriptionDetails>()
@@ -31,15 +29,12 @@ class MarketDataService(private val alphaVantageService: AlphaVantageService,
     fun subscribe(request: SubscriptionRequest): SubscriptionResponse 
     {
         val dataSource = request.dataSource ?: "gaussian-random"
-        logger.info("Processing subscription request for ${request.rics.size} stocks using $dataSource")
         val subscriptionId = generateSubscriptionId()
         val successfulRics = mutableListOf<String>()
-        
         for (ric in request.rics) 
         {
             try 
             {
-                logger.debug("Processing RIC: $ric with data source: $dataSource")
                 val subscriptionDetails = SubscriptionDetails(ric = ric, subscriptionId = subscriptionId)
                 subscriptions[ric] = subscriptionDetails
                 dataSourceType[ric] = dataSource

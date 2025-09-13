@@ -30,28 +30,15 @@ class GaussianRandomDataService
     
     fun generateMarketData(ric: String): Mono<MarketData>
     {
-        logger.debug("Generating random price for $ric using Gaussian distribution")
-        
         val currentPrice = generateRandomPrice(ric)
         val currentTime = LocalDateTime.now()
-        
-        val marketData = MarketData(
-            ric = ric,
-            symbol = ric,
-            price = currentPrice,
-            timestamp = currentTime
-        )
-        
-        logger.debug("Generated price $currentPrice for $ric")
+        val marketData = MarketData(ric = ric, symbol = ric, price = currentPrice, timestamp = currentTime)
         return Mono.just(marketData)
     }
     
     fun generateMarketDataForSymbols(rics: List<String>): Flux<MarketData>
     {
-        logger.debug("Generating random prices for ${rics.size} symbols using Gaussian distribution")
-        return Flux.fromIterable(rics)
-            .flatMap { ric -> generateMarketData(ric) }
-            .doOnComplete { logger.info("Completed generating random prices for ${rics.size} symbols") }
+        return Flux.fromIterable(rics).flatMap { ric -> generateMarketData(ric) }
     }
     
     private fun generateRandomPrice(ric: String): Double
@@ -62,7 +49,8 @@ class GaussianRandomDataService
         val newPrice: Double = previousPrice + priceChange
         val finalPrice = maxOf(newPrice, 0.01)
         stockPrices[ric] = finalPrice
-        return finalPrice
+        // To decimal places
+        return finalPrice.let { String.format("%.2f", it).toDouble() }
     }
     
     private fun generateGaussianRandom(): Double

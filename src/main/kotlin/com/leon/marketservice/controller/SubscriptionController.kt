@@ -23,7 +23,6 @@ class SubscriptionController(private val marketDataService: MarketDataService, p
         return try 
         {
             val response = marketDataService.subscribe(request)
-            logger.info("Successfully created subscription: ${response.subscriptionId}")
             ResponseEntity.ok(response)
         }
         catch (e: Exception)

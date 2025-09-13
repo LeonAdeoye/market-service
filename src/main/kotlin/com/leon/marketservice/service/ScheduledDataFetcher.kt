@@ -1,6 +1,7 @@
 package com.leon.marketservice.service
 
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 
@@ -11,6 +12,9 @@ class ScheduledDataFetcher( private val marketDataService: MarketDataService, pr
     private val logger = LoggerFactory.getLogger(ScheduledDataFetcher::class.java)
     private var alphaVantageBatchIndex = 0
     private val alphaVantageBatchSize = 5
+    
+    @Value("\${alpha.vantage.fallback.to.gaussian:true}")
+    private var fallbackToGaussian: Boolean = true
 
     @Scheduled(fixedRateString = "\${market.data.scheduled.fetch.interval.seconds:30}000")
     fun fetchMarketDataScheduled() 
@@ -63,11 +67,29 @@ class ScheduledDataFetcher( private val marketDataService: MarketDataService, pr
 
         alphaVantageService.fetchMarketDataForSymbols(currentBatch).subscribe(
         {
-            marketData -> ampsPublisherService.publishMarketData(marketData)
-            logger.debug("Published Alpha Vantage data for ${marketData.ric}")
+            marketData -> 
+            if (marketData.price == 0.0 && fallbackToGaussian)
+            {
+                logger.info("Alpha Vantage failed or returned price 0 for ${marketData.ric}, falling back to Gaussian random data")
+                // Fallback to Gaussian random data
+                gaussianRandomDataService.generateMarketDataForSymbols(listOf(marketData.ric)).subscribe(
+                {
+                    fallbackData -> ampsPublisherService.publishMarketData(fallbackData)
+                },
+                {
+                    error -> logger.error("Error generating fallback data for ${marketData.ric}", error)
+                })
+            }
+            else
+            {
+                if (marketData.price == 0.0)
+                    logger.warn("Alpha Vantage returned price 0 for ${marketData.ric}, but fallback is disabled")
+                ampsPublisherService.publishMarketData(marketData)
+                logger.debug("Published Alpha Vantage data for ${marketData.ric}")
+            }
         },
         {
-            error -> logger.error("Error fetching Alpha Vantage batch", error)
+            error -> logger.error("Unexpected error in Alpha Vantage batch processing", error)
         })
 
         alphaVantageBatchIndex = (alphaVantageBatchIndex + alphaVantageBatchSize) % allRics.size
@@ -80,7 +102,6 @@ class ScheduledDataFetcher( private val marketDataService: MarketDataService, pr
         gaussianRandomDataService.generateMarketDataForSymbols(allRics).subscribe(
         {
             marketData -> ampsPublisherService.publishMarketData(marketData)
-            logger.debug("Published Gaussian random data for ${marketData.ric}")
         },
         {
             error -> logger.error("Error fetching Gaussian random batch", error)

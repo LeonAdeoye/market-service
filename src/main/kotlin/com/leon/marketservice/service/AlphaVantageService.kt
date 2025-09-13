@@ -23,32 +23,29 @@ class AlphaVantageService(private val webClient: WebClient)
 
     fun fetchMarketData(ric: String): Mono<MarketData> 
     {
-        logger.debug("Fetching current price for $ric from Alpha Vantage")
-        
         val symbol = convertRicToSymbol(ric)
         val url = buildApiUrl(symbol)
-        
-        logger.debug("Making API request to Alpha Vantage: $url")
-        
         return webClient.get()
             .uri(url)
             .retrieve()
             .bodyToMono(Map::class.java)
             .map { response -> parseResponse(response, ric) }
-            .doOnSuccess { logger.info("Successfully fetched current price for $ric") }
-            .doOnError { e -> logger.error("Error fetching current price for $ric from Alpha Vantage", e) }
             .onErrorMap(WebClientResponseException::class.java)
-            { e -> logger.error("Alpha Vantage API error for $ric: ${e.statusCode} - ${e.responseBodyAsString}")
+            { e -> 
+                logger.warn("Alpha Vantage API error for $ric: ${e.statusCode} - ${e.responseBodyAsString}")
                 Exception("Failed to fetch data from Alpha Vantage: ${e.message}")
             }
     }
 
     fun fetchMarketDataForSymbols(rics: List<String>): Flux<MarketData> 
     {
-        logger.debug("Fetching current prices for ${rics.size} symbols from Alpha Vantage")
         return Flux.fromIterable(rics)
-            .flatMap { ric -> fetchMarketData(ric) }
-            .doOnComplete { logger.info("Completed fetching current prices for ${rics.size} symbols") }
+            .flatMap { ric -> fetchMarketData(ric)
+                    .onErrorResume {
+                        Mono.just(MarketData(ric = ric, symbol = convertRicToSymbol(ric), price = 0.0, timestamp = java.time.LocalDateTime.now()))
+                    }
+            }
+//            .doOnComplete { logger.info("Completed fetching current prices for ${rics.size} symbols") }
     }
 
     private fun convertRicToSymbol(ric: String): String 

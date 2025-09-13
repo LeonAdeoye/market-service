@@ -2,6 +2,9 @@ package com.leon.marketservice.service
 
 import com.leon.marketservice.model.MarketData
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.crankuptheamps.client.Client
+import jakarta.annotation.PreDestroy
+import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
@@ -15,44 +18,75 @@ class AmpsPublisherService(private val objectMapper: ObjectMapper)
     private lateinit var serverUrl: String
     @Value("\${amps.topic.prefix}")
     private lateinit var topicPrefix: String
+    @Value("\${amps.client.name:MarketDataPublisher}")
+    private lateinit var clientName: String
+    @Value("\${amps.enabled:true}")
+    private var ampsEnabled: Boolean = true
     private var isConnected = false
     private val topicCache = ConcurrentHashMap<String, String>()
+    private var ampsClient: Client? = null
 
+    @PostConstruct
     fun initialize() 
     {
+        if (!ampsEnabled)
+        {
+            logger.info("AMPS publishing is disabled via configuration")
+            return
+        }
+        
         try 
         {
             logger.info("Initializing AMPS connection to $serverUrl")
+            ampsClient = Client(clientName)
+            ampsClient?.connect(serverUrl)
+            ampsClient?.logon()
             isConnected = true
-            logger.info("Successfully connected to AMPS server (simulated)")
+            logger.info("Successfully connected to AMPS server at $serverUrl")
         } 
         catch (e: Exception) 
         {
-            logger.error("Failed to connect to AMPS server", e)
+            logger.warn("Failed to connect to AMPS server at $serverUrl. AMPS publishing will be disabled. Error: ${e.message}")
             isConnected = false
-            throw e
+            ampsClient = null
+            // Don't throw exception - allow service to start without AMPS
         }
     }
 
     fun publishMarketData(marketData: MarketData) 
     {
-        if (!isConnected) 
+        if (!ampsEnabled)
         {
-            logger.warn("AMPS not connected, attempting to reconnect")
-            initialize()
+            logger.debug("AMPS publishing is disabled, skipping publish for ${marketData.ric}")
+            return
+        }
+        
+        if (!isConnected || ampsClient == null) 
+        {
+            logger.debug("AMPS not connected, attempting to reconnect")
+            try
+            {
+                initialize()
+            }
+            catch (e: Exception)
+            {
+                logger.debug("Failed to reconnect to AMPS, skipping publish for ${marketData.ric}")
+                return
+            }
         }
         
         try
         {
             val topic = getTopicForRic(marketData.ric)
-            logger.debug("Publishing market data for ${marketData.ric} to topic $topic")
-            logger.info("Simulated AMPS publish: ${marketData.ric} -> $topic")
-            logger.debug("Successfully published market data for ${marketData.ric}")
+            val jsonPayload = objectMapper.writeValueAsString(marketData)
+            ampsClient?.publish(topic, jsonPayload)
+            logger.info("Published market data for ${marketData.ric} to topic $topic: price=${marketData.price}")
         }
         catch (e: Exception)
         {
             logger.error("Failed to publish market data for ${marketData.ric}", e)
-            throw e
+            isConnected = false
+            ampsClient = null
         }
     }
 
@@ -62,18 +96,21 @@ class AmpsPublisherService(private val objectMapper: ObjectMapper)
             "$topicPrefix.${ric.replace(".", "_")}"
         }
     }
-
-    private fun createMessageData(marketData: MarketData): Map<String, Any> 
+    
+    @PreDestroy
+    fun shutdown() 
     {
-        val messageData = mutableMapOf<String, Any>()
-        messageData["ric"] = marketData.ric
-        messageData["symbol"] = marketData.symbol
-        messageData["price"] = marketData.price.toString()
-        messageData["dataSource"] = "Alpha Vantage"
-        messageData["timestamp"] = marketData.timestamp.toString()
-        val jsonPayload = objectMapper.writeValueAsString(marketData)
-        messageData["jsonPayload"] = jsonPayload
-        return messageData
+        try 
+        {
+            if (ampsClient != null)
+            {
+                ampsClient?.disconnect()
+                logger.info("Disconnected from AMPS server")
+            }
+        } 
+        catch (e: Exception) 
+        {
+            logger.error("Error disconnecting from AMPS server", e)
+        }
     }
-
 }
