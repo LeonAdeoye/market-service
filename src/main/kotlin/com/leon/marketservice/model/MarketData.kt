@@ -7,9 +7,6 @@ data class MarketData(
     @field:JsonProperty("ric")
     val ric: String,
     
-    @field:JsonProperty("symbol")
-    val symbol: String,
-    
     @field:JsonProperty("price")
     val price: Double,
     

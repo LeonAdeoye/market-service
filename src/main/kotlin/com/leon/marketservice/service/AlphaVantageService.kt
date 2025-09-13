@@ -42,7 +42,7 @@ class AlphaVantageService(private val webClient: WebClient)
         return Flux.fromIterable(rics)
             .flatMap { ric -> fetchMarketData(ric)
                     .onErrorResume {
-                        Mono.just(MarketData(ric = ric, symbol = convertRicToSymbol(ric), price = 0.0, timestamp = java.time.LocalDateTime.now()))
+                        Mono.just(MarketData(ric = ric, price = 0.0, timestamp = java.time.LocalDateTime.now()))
                     }
             }
 //            .doOnComplete { logger.info("Completed fetching current prices for ${rics.size} symbols") }
@@ -66,8 +66,6 @@ class AlphaVantageService(private val webClient: WebClient)
 
     private fun parseResponse(response: Map<*, *>, ric: String): MarketData 
     {
-        val symbol = convertRicToSymbol(ric)
-        
         if (response.containsKey("Error Message"))
             throw Exception("Alpha Vantage API Error: ${response["Error Message"]}")
         
@@ -77,10 +75,10 @@ class AlphaVantageService(private val webClient: WebClient)
         if (!response.containsKey("Global Quote"))
             throw Exception("Expected Global Quote response for $ric")
         
-        return parseGlobalQuote(response, ric, symbol)
+        return parseGlobalQuote(response, ric)
     }
 
-    private fun parseGlobalQuote(response: Map<*, *>, ric: String, symbol: String): MarketData
+    private fun parseGlobalQuote(response: Map<*, *>, ric: String): MarketData
     {
         val globalQuote = response["Global Quote"] as? Map<*, *>
             ?: throw Exception("Invalid Global Quote format for $ric")
@@ -93,7 +91,6 @@ class AlphaVantageService(private val webClient: WebClient)
         
         return MarketData(
             ric = ric,
-            symbol = symbol,
             price = price,
             timestamp = currentTime
         )

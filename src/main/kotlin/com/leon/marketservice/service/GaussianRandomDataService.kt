@@ -32,7 +32,7 @@ class GaussianRandomDataService
     {
         val currentPrice = generateRandomPrice(ric)
         val currentTime = LocalDateTime.now()
-        val marketData = MarketData(ric = ric, symbol = ric, price = currentPrice, timestamp = currentTime)
+        val marketData = MarketData(ric = ric, price = currentPrice, timestamp = currentTime)
         return Mono.just(marketData)
     }
     
