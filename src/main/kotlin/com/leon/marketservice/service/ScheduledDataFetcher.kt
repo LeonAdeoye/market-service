@@ -97,7 +97,7 @@ class ScheduledDataFetcher( private val marketDataService: MarketDataService, pr
     
     private fun fetchGaussianRandomBatch(allRics: List<String>) 
     {
-        logger.debug("Fetching Gaussian random batch: ${allRics.size} RICs (${allRics.joinToString()})")
+        logger.info("Fetching Gaussian random batch: ${allRics.size} RICs (${allRics.joinToString()})")
 
         gaussianRandomDataService.generateMarketDataForSymbols(allRics).subscribe(
         {
