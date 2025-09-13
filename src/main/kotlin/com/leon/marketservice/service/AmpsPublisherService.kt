@@ -8,7 +8,6 @@ import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
-import java.util.concurrent.ConcurrentHashMap
 
 @Service
 class AmpsPublisherService(private val objectMapper: ObjectMapper) 
@@ -16,14 +15,13 @@ class AmpsPublisherService(private val objectMapper: ObjectMapper)
     private val logger = LoggerFactory.getLogger(AmpsPublisherService::class.java)
     @Value("\${amps.server.url}")
     private lateinit var serverUrl: String
-    @Value("\${amps.topic.prefix}")
-    private lateinit var topicPrefix: String
+    @Value("\${amps.topic.name}")
+    private lateinit var topicName: String
     @Value("\${amps.client.name:MarketDataPublisher}")
     private lateinit var clientName: String
     @Value("\${amps.enabled:true}")
     private var ampsEnabled: Boolean = true
     private var isConnected = false
-    private val topicCache = ConcurrentHashMap<String, String>()
     private var ampsClient: Client? = null
 
     @PostConstruct
@@ -49,7 +47,6 @@ class AmpsPublisherService(private val objectMapper: ObjectMapper)
             logger.warn("Failed to connect to AMPS server at $serverUrl. AMPS publishing will be disabled. Error: ${e.message}")
             isConnected = false
             ampsClient = null
-            // Don't throw exception - allow service to start without AMPS
         }
     }
 
@@ -77,7 +74,7 @@ class AmpsPublisherService(private val objectMapper: ObjectMapper)
         
         try
         {
-            val topic = getTopicForRic(marketData.ric)
+            val topic = topicName
             val jsonPayload = objectMapper.writeValueAsString(marketData)
             ampsClient?.publish(topic, jsonPayload)
             logger.info("Published market data for ${marketData.ric} to topic $topic: price=${marketData.price}")
@@ -87,13 +84,6 @@ class AmpsPublisherService(private val objectMapper: ObjectMapper)
             logger.error("Failed to publish market data for ${marketData.ric}", e)
             isConnected = false
             ampsClient = null
-        }
-    }
-
-    private fun getTopicForRic(ric: String): String 
-    {
-        return topicCache.computeIfAbsent(ric) {
-            "$topicPrefix.${ric.replace(".", "_")}"
         }
     }
     
