@@ -6,5 +6,7 @@ import jakarta.validation.constraints.NotEmpty
 data class SubscriptionRequest(
     @field:NotEmpty(message = "RICs list cannot be empty")
     @field:JsonProperty("rics")
-    val rics: List<String>
+    val rics: List<String>,
+    @field:JsonProperty("dataSource")
+    val dataSource: String? = null
 )

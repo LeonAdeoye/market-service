@@ -33,24 +33,6 @@ class SubscriptionController(private val marketDataService: MarketDataService, p
             ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse)
         }
     }
-    
-    @PostMapping("/subscribe/{dataSource}")
-    fun subscribeWithDataSource(@PathVariable dataSource: String, @Valid @RequestBody request: SubscriptionRequest): ResponseEntity<SubscriptionResponse> 
-    {
-        logger.info("Received subscription request for RICs: ${request.rics} with data source: $dataSource")
-        return try 
-        {
-            val response = marketDataService.subscribe(request, dataSource)
-            logger.info("Successfully created subscription: ${response.subscriptionId} with data source: $dataSource")
-            ResponseEntity.ok(response)
-        }
-        catch (e: Exception)
-        {
-            logger.error("Failed to create subscription for RICs: ${request.rics} with data source: $dataSource", e)
-            val errorResponse = SubscriptionResponse(success = false, message = "Failed to create subscription: ${e.message}")
-            ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse)
-        }
-    }
 
     @DeleteMapping("/unsubscribe/{ric}")
     fun unsubscribe(@PathVariable ric: String): ResponseEntity<Map<String, Any>> 

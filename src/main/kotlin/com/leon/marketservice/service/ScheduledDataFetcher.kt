@@ -12,7 +12,7 @@ class ScheduledDataFetcher( private val marketDataService: MarketDataService, pr
     private var alphaVantageBatchIndex = 0
     private val alphaVantageBatchSize = 5
 
-    @Scheduled(fixedRateString = "\${market.data.scheduled.fetch.interval.seconds:30}000") // Configurable interval
+    @Scheduled(fixedRateString = "\${market.data.scheduled.fetch.interval.seconds:30}000")
     fun fetchMarketDataScheduled() 
     {
         try 
@@ -29,16 +29,14 @@ class ScheduledDataFetcher( private val marketDataService: MarketDataService, pr
             for (subscription in subscriptionList)
             {
                 val ric = subscription["ric"] as String
-                val dataSource = subscription["dataSource"] as? String ?: "alpha-vantage"
-                
-                when (dataSource)
+                when (val dataSource = subscription["dataSource"] as? String ?: "alpha-vantage")
                 {
                     "alpha-vantage" -> alphaVantageRics.add(ric)
                     "gaussian-random" -> gaussianRandomRics.add(ric)
                     else -> 
                     {
-                        logger.warn("Unknown data source '$dataSource' for RIC $ric, defaulting to Alpha Vantage")
-                        alphaVantageRics.add(ric)
+                        logger.warn("Unknown data source '$dataSource' for RIC $ric, defaulting to Gaussian random.")
+                        gaussianRandomRics.add(ric)
                     }
                 }
             }

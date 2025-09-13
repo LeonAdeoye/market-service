@@ -26,15 +26,11 @@ class MarketDataService(private val alphaVantageService: AlphaVantageService,
 {
     private val logger = LoggerFactory.getLogger(MarketDataService::class.java)
     private val subscriptions = ConcurrentHashMap<String, SubscriptionDetails>()
-    private val dataSourceType = ConcurrentHashMap<String, String>() // RIC -> data source type
+    private val dataSourceType = ConcurrentHashMap<String, String>()
 
     fun subscribe(request: SubscriptionRequest): SubscriptionResponse 
     {
-        return subscribe(request, "alpha-vantage")
-    }
-    
-    fun subscribe(request: SubscriptionRequest, dataSource: String): SubscriptionResponse 
-    {
+        val dataSource = request.dataSource ?: "gaussian-random"
         logger.info("Processing subscription request for ${request.rics.size} stocks using $dataSource")
         val subscriptionId = generateSubscriptionId()
         val successfulRics = mutableListOf<String>()
@@ -70,7 +66,6 @@ class MarketDataService(private val alphaVantageService: AlphaVantageService,
         if (subscription != null)
         {
             logger.info("Successfully unsubscribed from $ric (was using $dataSource)")
-            // Reset price history for Gaussian random data source
             if (dataSource == "gaussian-random")
                 gaussianRandomDataService.resetPrice(ric)
         }
