@@ -27,10 +27,7 @@ class CryptoDataScheduler(private val coinMarketCapService: CoinMarketCapService
         try
         {
             if (subscriptions.isEmpty())
-            {
-                logger.debug("No active crypto subscriptions to fetch data for")
                 return
-            }
 
             val symbols = subscriptions.keys.toList()
             logger.debug("Scheduled crypto data fetch starting for ${symbols.size} instruments")

@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/crypto")
+@CrossOrigin
 class CryptoPriceController(private val cryptoMarketDataService: CryptoMarketDataService)
 {
     private val logger = LoggerFactory.getLogger(CryptoPriceController::class.java)
