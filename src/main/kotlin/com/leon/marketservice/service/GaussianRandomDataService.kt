@@ -17,11 +17,11 @@ class GaussianRandomDataService
     @Value("\${gaussian.random.base.price:100.0}")
     private var basePrice: Double = 100.0
     
-    @Value("\${gaussian.random.volatility:0.02}")
-    private var volatility: Double = 0.02
+    @Value("\${gaussian.random.volatility:0.15}")
+    private var volatility: Double = 0.15
     
-    @Value("\${gaussian.random.drift:0.0001}")
-    private var drift: Double = 0.0001
+    @Value("\${gaussian.random.drift:0.0}")
+    private var drift: Double = 0.0
     
     private val random = Random.Default
     private val stockPrices = mutableMapOf<String, Double>()
@@ -47,7 +47,14 @@ class GaussianRandomDataService
         val gaussianRandom = generateGaussianRandom()
         val priceChange: Double = previousPrice * (drift + volatility * gaussianRandom)
         val newPrice: Double = previousPrice + priceChange
-        val finalPrice = maxOf(newPrice, 0.01)
+        
+        // Ensure price stays within ±20% of the original base price
+        val minPrice = basePrice * 0.8  // -20% of base price
+        val maxPrice = basePrice * 1.2  // +20% of base price
+        val clampedPrice = newPrice.coerceIn(minPrice, maxPrice)
+        
+        // Ensure price is never negative
+        val finalPrice = maxOf(clampedPrice, 0.01)
         stockPrices[ric] = finalPrice
         // To decimal places
         return finalPrice.let { String.format("%.2f", it).toDouble() }
