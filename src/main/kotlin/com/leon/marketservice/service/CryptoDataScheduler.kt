@@ -30,12 +30,10 @@ class CryptoDataScheduler(private val coinMarketCapService: CoinMarketCapService
                 return
 
             val symbols = subscriptions.keys.toList()
-            logger.debug("Scheduled crypto data fetch starting for ${symbols.size} instruments")
             coinMarketCapService.fetchCryptoPriceDataForSymbols(symbols)
                 .subscribe(
                     {
                         cryptoData ->
-                            logger.debug("Publishing crypto data for ${cryptoData.symbol}")
                             ampsPublisherService.publishCryptoData(cryptoData)
                     },
                     {

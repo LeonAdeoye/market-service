@@ -28,6 +28,7 @@ class CoinMarketCapService(private val webClient: WebClient)
             .header("Accept", "application/json")
             .retrieve()
             .bodyToMono(Map::class.java)
+            .doOnNext { response -> logger.info("CoinMarketCap API response for $symbol: $response") }
             .map { response -> parseResponse(response, symbol) }
             .onErrorMap(WebClientResponseException::class.java)
             {
@@ -64,13 +65,18 @@ class CoinMarketCapService(private val webClient: WebClient)
         val usdQuote = quote?.get("USD") as? Map<*, *> ?: throw Exception("No USD quote found for $symbol")
         val currentTime = LocalDateTime.now()
         
+        val price = parseDouble(usdQuote["price"] as? Number)
+        val vol24h = parseDouble(usdQuote["volume_24h"] as? Number)
+        
+        logger.info("Parsed data for $symbol - price: $price, vol24h: $vol24h")
+        
         return CryptoPriceData(
             symbol = symbol,
-            price = parseDouble(usdQuote["price"] as? Double),
-            vol24h = parseDouble(usdQuote["volume_24h"] as? Double),
+            price = price,
+            vol24h = vol24h,
             timestamp = currentTime
         )
     }
 
-    private fun parseDouble(value: Double?): Double? = value?.takeIf { it > 0.0 }
+    private fun parseDouble(value: Number?): Double? = value?.toDouble()?.takeIf { it > 0.0 }
 }
