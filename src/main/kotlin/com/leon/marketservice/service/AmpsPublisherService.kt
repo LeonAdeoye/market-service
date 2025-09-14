@@ -117,7 +117,7 @@ class AmpsPublisherService(private val objectMapper: ObjectMapper)
             val topic = cryptoTopicName
             val jsonPayload = objectMapper.writeValueAsString(cryptoData)
             ampsClient?.publish(topic, jsonPayload)
-            logger.info("Published crypto data for ${cryptoData.symbol} to topic $topic")
+            logger.info("Published crypto data for ${cryptoData.symbol} to topic $topic: price=${cryptoData.price}")
         }
         catch (e: Exception)
         {

@@ -28,7 +28,6 @@ class CoinMarketCapService(private val webClient: WebClient)
             .header("Accept", "application/json")
             .retrieve()
             .bodyToMono(Map::class.java)
-            .doOnNext { response -> logger.info("CoinMarketCap API response for $symbol: $response") }
             .map { response -> parseResponse(response, symbol) }
             .onErrorMap(WebClientResponseException::class.java)
             {
@@ -41,8 +40,10 @@ class CoinMarketCapService(private val webClient: WebClient)
     fun fetchCryptoPriceDataForSymbols(symbols: List<String>): Flux<CryptoPriceData> 
     {
         return Flux.fromIterable(symbols)
-            .flatMap { symbol -> fetchCryptoPriceData(symbol)
-                    .onErrorResume {
+            .flatMap { symbol -> 
+                fetchCryptoPriceData(symbol)
+                    .onErrorResume { error ->
+                        logger.warn("Falling back to empty data for $symbol due to error: ${error.message}")
                         Mono.just(CryptoPriceData(symbol = symbol))
                     }
             }
@@ -53,7 +54,8 @@ class CoinMarketCapService(private val webClient: WebClient)
     private fun parseResponse(response: Map<*, *>, symbol: String): CryptoPriceData 
     {
         val status = response["status"] as? Map<*, *>
-        if (status?.get("error_code") != null)
+        val errorCode = status?.get("error_code") as? Number
+        if (errorCode != null && errorCode.toInt() != 0)
         {
             val errorMessage = status["error_message"] as? String ?: "Unknown error"
             throw Exception("CoinMarketCap API Error: $errorMessage")
@@ -65,10 +67,11 @@ class CoinMarketCapService(private val webClient: WebClient)
         val usdQuote = quote?.get("USD") as? Map<*, *> ?: throw Exception("No USD quote found for $symbol")
         val currentTime = LocalDateTime.now()
         
-        val price = parseDouble(usdQuote["price"] as? Number)
-        val vol24h = parseDouble(usdQuote["volume_24h"] as? Number)
+        val rawPrice = usdQuote["price"]
+        val rawVol24h = usdQuote["volume_24h"]
         
-        logger.info("Parsed data for $symbol - price: $price, vol24h: $vol24h")
+        val price = parseDouble(rawPrice as? Number)
+        val vol24h = parseDouble(rawVol24h as? Number)
         
         return CryptoPriceData(
             symbol = symbol,
@@ -78,5 +81,18 @@ class CoinMarketCapService(private val webClient: WebClient)
         )
     }
 
-    private fun parseDouble(value: Number?): Double? = value?.toDouble()?.takeIf { it > 0.0 }
+    private fun parseDouble(value: Number?): Double? 
+    {
+        return try 
+        {
+            val doubleValue = value?.toDouble()
+            doubleValue?.takeIf { it > 0.0 }?.let { 
+                Math.round(it * 100.0) / 100.0 
+            }
+        }
+        catch (e: Exception)
+        {
+            null
+        }
+    }
 }
