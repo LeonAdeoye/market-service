@@ -105,8 +105,5 @@ class MarketDataService(private val alphaVantageService: AlphaVantageService, pr
         )
     }
 
-    private fun generateSubscriptionId(): String 
-    {
-        return java.util.UUID.randomUUID().toString()
-    }
+    private fun generateSubscriptionId(): String = java.util.UUID.randomUUID().toString()
 }

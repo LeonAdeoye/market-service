@@ -1,6 +1,7 @@
 package com.leon.marketservice.service
 
 import com.leon.marketservice.model.MarketData
+import com.leon.marketservice.model.CryptoPriceData
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.crankuptheamps.client.Client
 import jakarta.annotation.PreDestroy
@@ -17,6 +18,8 @@ class AmpsPublisherService(private val objectMapper: ObjectMapper)
     private lateinit var serverUrl: String
     @Value("\${amps.topic.name}")
     private lateinit var topicName: String
+    @Value("\${amps.crypto.topic.name}")
+    private lateinit var cryptoTopicName: String
     @Value("\${amps.client.name:MarketDataPublisher}")
     private lateinit var clientName: String
     @Value("\${amps.enabled:true}")
@@ -82,6 +85,43 @@ class AmpsPublisherService(private val objectMapper: ObjectMapper)
         catch (e: Exception)
         {
             logger.error("Failed to publish market data for ${marketData.ric}", e)
+            isConnected = false
+            ampsClient = null
+        }
+    }
+
+    fun publishCryptoData(cryptoData: CryptoPriceData) 
+    {
+        if (!ampsEnabled)
+        {
+            logger.debug("AMPS publishing is disabled, skipping crypto publish for ${cryptoData.symbol}")
+            return
+        }
+        
+        if (!isConnected || ampsClient == null) 
+        {
+            logger.debug("AMPS not connected, attempting to reconnect")
+            try
+            {
+                initialize()
+            }
+            catch (e: Exception)
+            {
+                logger.debug("Failed to reconnect to AMPS, skipping crypto publish for ${cryptoData.symbol}")
+                return
+            }
+        }
+        
+        try
+        {
+            val topic = cryptoTopicName
+            val jsonPayload = objectMapper.writeValueAsString(cryptoData)
+            ampsClient?.publish(topic, jsonPayload)
+            logger.info("Published crypto data for ${cryptoData.symbol} to topic $topic")
+        }
+        catch (e: Exception)
+        {
+            logger.error("Failed to publish crypto data for ${cryptoData.symbol}", e)
             isConnected = false
             ampsClient = null
         }

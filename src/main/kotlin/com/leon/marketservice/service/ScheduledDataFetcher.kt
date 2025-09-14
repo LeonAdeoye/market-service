@@ -16,7 +16,7 @@ class ScheduledDataFetcher( private val marketDataService: MarketDataService, pr
     @Value("\${alpha.vantage.fallback.to.gaussian:true}")
     private var fallbackToGaussian: Boolean = true
 
-    @Scheduled(fixedRateString = "\${market.data.scheduled.fetch.interval.seconds:30}000")
+    @Scheduled(fixedRateString = "\${market.data.scheduled.fetch.interval.seconds:20}000")
     fun fetchMarketDataScheduled() 
     {
         try 
