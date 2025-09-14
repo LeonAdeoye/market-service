@@ -66,22 +66,11 @@ class CoinMarketCapService(private val webClient: WebClient)
         
         return CryptoPriceData(
             symbol = symbol,
-            bestAsk = parseDouble(usdQuote["ask_price"] as? Double),
-            bestBid = parseDouble(usdQuote["bid_price"] as? Double),
-            vwapToday = parseDouble(usdQuote["vwap_24h"] as? Double),
-            vwap24h = parseDouble(usdQuote["vwap_24h"] as? Double),
-            low = parseDouble(usdQuote["low_24h"] as? Double),
-            high = parseDouble(usdQuote["high_24h"] as? Double),
-            open = parseDouble(usdQuote["open_24h"] as? Double),
-            close = parseDouble(usdQuote["price"] as? Double),
-            volToday = parseDouble(usdQuote["volume_24h"] as? Double),
+            price = parseDouble(usdQuote["price"] as? Double),
             vol24h = parseDouble(usdQuote["volume_24h"] as? Double),
-            numTrades = parseLong(usdQuote["num_market_pairs"] as? Number),
-            numTrades24h = parseLong(usdQuote["num_market_pairs"] as? Number),
             timestamp = currentTime
         )
     }
 
     private fun parseDouble(value: Double?): Double? = value?.takeIf { it > 0.0 }
-    private fun parseLong(value: Number?): Long? = value?.toLong()?.takeIf { it > 0 }
 }
